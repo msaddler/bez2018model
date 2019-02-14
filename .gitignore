@@ -1,0 +1,59 @@
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+*.hdf5
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# MATLAB specific #
+###################
+*.m~
+*.mat
+*.fig
+
+# OTHER #
+#########
+.ipynb_checkpoints*
+.nfs*
+*.out
+*.py~
+*.sh~
+*.ckpt*
+__pycache__
+*~
+*.json
+felix-cache*
+*.??#
+=*
