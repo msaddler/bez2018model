@@ -1,0 +1,8 @@
+README.md
+setup.py
+bez2018model/__init__.py
+bez2018model/core.py
+bez2018model.egg-info/PKG-INFO
+bez2018model.egg-info/SOURCES.txt
+bez2018model.egg-info/dependency_links.txt
+bez2018model.egg-info/top_level.txt
