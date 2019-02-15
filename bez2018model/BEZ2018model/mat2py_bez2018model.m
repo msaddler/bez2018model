@@ -14,7 +14,6 @@ function out = mat2py_bez2018model(signal, signal_Fs,...
 % RETURNS:
 %   out (struct / Python dict)
 
-addpath('ANmodel_BEZ2018/'); % Add path for ANmodel
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% PARSE INPUTS

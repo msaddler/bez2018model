@@ -1,11 +1,17 @@
 import sys
 import matlab.engine
 import numpy as np
+import os
+from bez2018model import PACKAGE_TOP_DIR, PACKAGE_ASSETS_TOP_DIR
 
 
 def start_matlab_engine():
     print('Starting matlab engine ...')
-    return matlab.engine.start_matlab()
+    eng = matlab.engine.start_matlab()
+    print('Adding path:', PACKAGE_ASSETS_TOP_DIR)
+    assert(os.path.isdir(PACKAGE_ASSETS_TOP_DIR))
+    eng.addpath(eng.genpath(PACKAGE_ASSETS_TOP_DIR), nargout=0)
+    return eng
 
 
 def quit_matlab_engine(eng):
@@ -77,7 +83,8 @@ def generate_nervegram(eng, signal, signal_Fs, output_params, ANmodel_params, ma
     manipulation_params = convert_arrays_to_matlab(manipulation_params)
     # Run the BEZ2018 Auditory nerve model
     out = eng.mat2py_bez2018model(signal, signal_Fs, output_params,
-                                  ANmodel_params, manipulation_params, nargout=1)
+                                  ANmodel_params, manipulation_params,
+                                  nargout=1)
     # Cast output fields to numpy arrays and return
     out = convert_arrays_to_numpy(out)
     return out
