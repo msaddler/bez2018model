@@ -53,7 +53,8 @@ def convert_arrays_to_matlab(param_dict):
     out (dict): array fields contain MATLAB arrays
     '''
     for key in param_dict.keys():
-        param_dict[key] = matlab.double([param_dict[key]])
+        if not type(param_dict[key]) is matlab.double:
+            param_dict[key] = matlab.double([param_dict[key]])
     return param_dict
 
 
