@@ -2,7 +2,9 @@ import sys
 import matlab.engine
 import numpy as np
 import os
-from bez2018model import PACKAGE_TOP_DIR, PACKAGE_ASSETS_TOP_DIR
+
+PACKAGE_TOP_DIR = os.path.dirname(os.path.realpath(__file__))
+PACKAGE_ASSETS_TOP_DIR = os.path.join(PACKAGE_TOP_DIR, 'BEZ2018model')
 
 
 def start_matlab_engine():

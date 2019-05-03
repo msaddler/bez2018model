@@ -142,12 +142,16 @@ end
 
 % Clip the ends of full-length nervegram to interval of specified length
 meanrates_clipped_len = meanrates_dur * meanrates_Fs;
-buffer_front = ceil(buffer_front_dur * meanrates_Fs);
-buffer_end = meanrates_len - floor(buffer_end_dur * meanrates_Fs);
-clip_start = randi([buffer_front, buffer_end - meanrates_clipped_len]);
+clip_start = 1;
 clip_end = clip_start + meanrates_clipped_len - 1;
-assert(clip_end <= buffer_end, 'meanrates clip_end is out of buffered range')
-meanrates = meanrates(:, clip_start:clip_end, :);
+if meanrates_clipped_len < meanrates_len
+    buffer_front = ceil(buffer_front_dur * meanrates_Fs);
+    buffer_end = meanrates_len - floor(buffer_end_dur * meanrates_Fs);
+    clip_start = randi([buffer_front, buffer_end - meanrates_clipped_len]);
+    clip_end = clip_start + meanrates_clipped_len - 1;
+    assert(clip_end <= buffer_end, 'meanrates clip_end is out of buffered range')
+    meanrates = meanrates(:, clip_start:clip_end, :);
+end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
