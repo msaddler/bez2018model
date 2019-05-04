@@ -174,12 +174,15 @@ out.meanrates_clip_indexes = [clip_start, clip_end];
 out.meanrates_filt_order = filt_order;
 out.meanrates_filt_cutoff = filt_cutoff;
 % ANmodel specified parameters
-out.ANmodel_CF_list = CF_list;
-out.ANmodel_spont_list = spont_list;
-out.ANmodel_cohc = cohc;
-out.ANmodel_cihc = cihc;
-out.ANmodel_species = species;
-out.ANmodel_noiseType = noiseType;
-out.ANmodel_implnt = implnt;
+out.CF_list = CF_list;
+out.spont_list = spont_list;
+out.cohc = cohc;
+out.cihc = cihc;
+out.species = species;
+out.noiseType = noiseType;
+out.implnt = implnt;
+out.set_dBSPL_flag = set_dBSPL_flag;
+out.buffer_front_dur = buffer_front_dur;
+out.buffer_end_dur = buffer_end_dur;
 
 end
