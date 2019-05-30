@@ -51,6 +51,18 @@ spont_list = ANmodel_params.spont_list; % Spont rate list (fiber types)
 cohc = ANmodel_params.cohc;
 cihc = ANmodel_params.cihc;
 species = ANmodel_params.species;
+noiseType = 1; % 1=variable fGn; 0=fixed fGn (fGn is spont rate fluctuation)
+if isfield(ANmodel_params, 'noiseType')
+    noiseType = ANmodel_params.noiseType;
+end
+implnt = 0; % 0=approximate; 1=actual implementation of the power-law fcns
+if isfield(ANmodel_params, 'implnt')
+    implnt = ANmodel_params.implnt;
+end
+noisy_meanrates_flag = 0; % 0=analytical estimate; 1=noisy estimate
+if isfield(ANmodel_params, 'noisy_meanrates_flag')
+    noisy_meanrates_flag = ANmodel_params.noisy_meanrates_flag;
+end
 
 % manipulation_params struct (add cochlear manipulations here)
 manipulation_flag = 0; % Flag sets whether or not manipulations are applied
@@ -92,8 +104,6 @@ end
 % Model fiber parameters
 tabs = 0.6e-3; % Absolute refractory period (s)
 trel = 0.6e-3; % Baseline mean relative refractory period (s)
-noiseType = 1; % 1 for variable fGn (0 for fixed fGn)
-implnt = 0; % 0=approximate; 1=actual implementation of the power-law fcns
 
 % Model time parameters
 T = length(pin) / pin_Fs; % duration of signal (s)
@@ -114,9 +124,13 @@ for itrC = 1:length(CF_list) % Iterate over CFs
     for itrF = 1:length(spont_list) % Iterate over spont rates
         spont = spont_list(itrF);
         % Run inner hair cell (IHC) model %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        [~, meanrate, ~, ~, ~,~] = MS_model_Synapse_BEZ2018(...
+        [~, meanrate, varrate, ~, ~,~] = MS_model_Synapse_BEZ2018(...
             vihc, CF, nrep, dt, noiseType, implnt, spont, tabs, trel);
-    
+        % Include noise using analytical estimate of instantaneous variance
+        if noisy_meanrates_flag
+            meanrate = meanrate + (randn(size(meanrate)) .* sqrt(varrate));
+            meanrate(meanrate < 0) = 0;
+        end
         % Store downsampled output of AN synapse model
         meanrate = resample(meanrate, meanrates_Fs, pin_Fs);
         meanrate(meanrate < 0) = 0; % Remove negative resampling artifacts
@@ -181,6 +195,7 @@ out.cihc = cihc;
 out.species = species;
 out.noiseType = noiseType;
 out.implnt = implnt;
+out.noisy_meanrates_flag = noisy_meanrates_flag;
 out.set_dBSPL_flag = set_dBSPL_flag;
 out.buffer_front_dur = buffer_front_dur;
 out.buffer_end_dur = buffer_end_dur;
