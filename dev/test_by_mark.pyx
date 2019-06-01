@@ -2,8 +2,8 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 from libc.stdlib cimport malloc
-# from . import util
-# import scipy.signal as dsp
+import util
+import scipy.signal
 
 cimport numpy as np
 
@@ -24,26 +24,44 @@ cdef extern from "model_IHC_BEZ2018.h":
         double *ihcout
     )
 
-# cdef extern from "model_Synapse.h":
-#     double Synapse(
-#         double *ihcout,
-#         double tdres,
-#         double cf,
-#         int totalstim,
-#         int nrep,
-#         double spont,
-#         double noiseType,
-#         double implnt,
-#         double sampFreq,
-#         double *synouttmp
-#     )
-#     int SpikeGenerator(
-#         double *synouttmp,
-#         double tdres,
-#         int totalstim,
-#         int nrep,
-#         double *sptime
-#     )
+cdef extern from "model_Synapse_BEZ2018.h":
+    void SingleAN(
+        double *px,
+        double cf,
+        int nrep,
+        double tdres,
+        int totalstim,
+        double noiseType,
+        double implnt,
+        double spont,
+        double tabs,
+        double trel,
+        double *meanrate,
+        double *varrate,
+        double *psth,
+        double *synout,
+        double *trd_vector,
+        double *trel_vector
+    )
+    # double Synapse(
+    #     double *ihcout,
+    #     double tdres,
+    #     double cf,
+    #     int totalstim,
+    #     int nrep,
+    #     double spont,
+    #     double noiseType,
+    #     double implnt,
+    #     double sampFreq,
+    #     double *synouttmp
+    # )
+    # int SpikeGenerator(
+    #     double *synouttmp,
+    #     double tdres,
+    #     int totalstim,
+    #     int nrep,
+    #     double *sptime
+    # )
 
 
 cdef extern from "Python.h":
@@ -234,83 +252,74 @@ def run_ihc(
 
 
 
-# cdef public double* generate_random_numbers(long length):
-#     arr = np.random.rand(length)
-#
-#     if not arr.flags['C_CONTIGUOUS']:
-#         arr = arr.copy(order='C')
-#
-#     cdef double *data_ptr = <double *>np.PyArray_DATA(arr)
-#     cdef double *out_ptr = <double *>malloc(length * sizeof(double))
-#     memcpy(out_ptr, data_ptr, length*sizeof(double))
-#
-#     return out_ptr
+cdef public double* generate_random_numbers(long length):
+    arr = np.random.rand(length)
+
+    if not arr.flags['C_CONTIGUOUS']:
+        arr = arr.copy(order='C')
+
+    cdef double *data_ptr = <double *>np.PyArray_DATA(arr)
+    cdef double *out_ptr = <double *>malloc(length * sizeof(double))
+    memcpy(out_ptr, data_ptr, length*sizeof(double))
+
+    return out_ptr
 
 
 
 
-# cdef public double* decimate(
-#     int k,
-#     double *signal,
-#     int q
-# ):
-#     """Decimate a signal
-#     k: number of samples in signal
-#     signal: pointer to the signal
-#     q: decimation factor
-#     This implementation was inspired by scipy.signal.decimate.
-#     """
-#     # signal_arr will not own the data, signal's array has to be freed
-#     # after return from this function
-#     signal_arr = PyArray_SimpleNewFromData(
-#         1,                      # nd
-#         [k],                    # dims
-#         np.NPY_DOUBLE,          # typenum
-#         <void *>signal          # data
-#     )
-#
-#
-#     # resampled = dsp.resample(
-#     #     signal_arr,
-#     #     len(signal_arr) // q
-#     # )
-#
-#
-#     b = dsp.firwin(q+1, 1./q, window='hamming')
-#     a = [1.]
-#
-#     filtered = dsp.filtfilt(
-#         b=b,
-#         a=a,
-#         x=signal_arr
-#     )
-#
-#     resampled = filtered[::q]
-#
-#
-#     if not resampled.flags['C_CONTIGUOUS']:
-#         resampled = resampled.copy(order='C')
-#
-#
-#     # Copy data to output array
-#     cdef double *resampled_ptr = <double *>np.PyArray_DATA(resampled)
-#     cdef double *out_ptr = <double *>malloc(len(resampled)*sizeof(double))
-#     memcpy(out_ptr, resampled_ptr, len(resampled)*sizeof(double))
-#
-#     return out_ptr
+cdef public double* decimate(
+    int k,
+    double *signal,
+    int q
+):
+    """Decimate a signal
+    k: number of samples in signal
+    signal: pointer to the signal
+    q: decimation factor
+    This implementation was inspired by scipy.signal.decimate.
+    """
+    # signal_arr will not own the data, signal's array has to be freed
+    # after return from this function
+    signal_arr = PyArray_SimpleNewFromData(
+        1,                      # nd
+        [k],                    # dims
+        np.NPY_DOUBLE,          # typenum
+        <void *>signal          # data
+    )
+
+    b = scipy.signal.firwin(q+1, 1./q, window='hamming')
+    a = [1.]
+
+    filtered = scipy.signal.filtfilt(
+        b=b,
+        a=a,
+        x=signal_arr
+    )
+
+    resampled = filtered[::q]
+
+    if not resampled.flags['C_CONTIGUOUS']:
+        resampled = resampled.copy(order='C')
+
+    # Copy data to output array
+    cdef double *resampled_ptr = <double *>np.PyArray_DATA(resampled)
+    cdef double *out_ptr = <double *>malloc(len(resampled)*sizeof(double))
+    memcpy(out_ptr, resampled_ptr, len(resampled)*sizeof(double))
+
+    return out_ptr
 
 
-# cdef public double* ffGn(int N, double tdres, double Hinput, double noiseType, double mu):
-#     """util.ffGn() wrapper"""
-#
-#     a = util.ffGn(N, tdres, Hinput, noiseType, mu)
-#
-#     if not a.flags['C_CONTIGUOUS']:
-#         a = a.copy(order='C')
-#
-#     # Copy data to output array
-#     cdef double *ptr = <double *>np.PyArray_DATA(a)
-#     cdef double *out_ptr = <double *>malloc(len(a)*sizeof(double))
-#     memcpy(out_ptr, ptr, len(a)*sizeof(double))
-#
-#     return out_ptr
+cdef public double* ffGn(int N, double tdres, double Hinput, double noiseType, double mu):
+    """util.ffGn() wrapper"""
+
+    a = util.ffGn(N, tdres, Hinput, noiseType, mu)
+
+    if not a.flags['C_CONTIGUOUS']:
+        a = a.copy(order='C')
+
+    # Copy data to output array
+    cdef double *ptr = <double *>np.PyArray_DATA(a)
+    cdef double *out_ptr = <double *>malloc(len(a)*sizeof(double))
+    memcpy(out_ptr, ptr, len(a)*sizeof(double))
+
+    return out_ptr

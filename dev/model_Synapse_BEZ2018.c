@@ -19,13 +19,10 @@
  * (based on https://github.com/mrkrd/cochlea/blob/master/cochlea/zilany2014)
  */
 
- #include "Python.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-// #include <mex.h>
 #include <time.h>
 
 #include "complex.hpp"
@@ -144,10 +141,10 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     double *m1, *m2, *m3, *m4, *m5;
     double *n1, *n2, *n3;
 
-    mxArray	*randInputArray[5], *randOutputArray[1];
+    // mxArray	*randInputArray[5], *randOutputArray[1];
     double *randNums;
 
-    mxArray	*IhcInputArray[3], *IhcOutputArray[1];
+    // mxArray	*IhcInputArray[3], *IhcOutputArray[1];
     double *sampIHC, *ihcDims;
 
     mappingOut = (double*)calloc((long) ceil(totalstim*nrep),sizeof(double));
@@ -176,19 +173,24 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     /*----------------------------------------------------------*/
     /*------- Generating a random sequence ---------------------*/
     /*----------------------------------------------------------*/
-    randInputArray[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(randInputArray[0])= ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq);
-    randInputArray[1] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(randInputArray[1])= 1/sampFreq;
-    randInputArray[2] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(randInputArray[2])= 0.9; /* Hurst index */
-    randInputArray[3] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(randInputArray[3])= noiseType; /* fixed or variable fGn */
-    randInputArray[4] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(randInputArray[4])= spont; /* high, medium, or low */
-
-    mexCallMATLAB(1, randOutputArray, 5, randInputArray, "ffGn");
-    randNums = mxGetPr(randOutputArray[0]);
+    randNums = ffGn((int)ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),
+                     1/sampFreq,
+                     0.9,
+                     noiseType,
+                     spont);
+    // randInputArray[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(randInputArray[0])= ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq);
+    // randInputArray[1] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(randInputArray[1])= 1/sampFreq;
+    // randInputArray[2] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(randInputArray[2])= 0.9; /* Hurst index */
+    // randInputArray[3] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(randInputArray[3])= noiseType; /* fixed or variable fGn */
+    // randInputArray[4] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(randInputArray[4])= spont; /* high, medium, or low */
+    //
+    // mexCallMATLAB(1, randOutputArray, 5, randInputArray, "ffGn");
+    // randNums = mxGetPr(randOutputArray[0]);
     /*----------------------------------------------------------*/
     /*----- Mapping Function from IHCOUT to input to the PLA ----------------------*/
     /*----------------------------------------------------------*/
@@ -215,16 +217,18 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     /*----------------------------------------------------------*/
     /*------ Downsampling to sampFreq (Low) sampling rate ------*/
     /*----------------------------------------------------------*/
-    IhcInputArray[0] = mxCreateDoubleMatrix(1, k, mxREAL);
-    ihcDims = mxGetPr(IhcInputArray[0]);
-    for (i=0;i<k;++i)
-        ihcDims[i] = powerLawIn[i];
-    IhcInputArray[1] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(IhcInputArray[1])= 1;
-    IhcInputArray[2] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    *mxGetPr(IhcInputArray[2])= resamp;
-    mexCallMATLAB(1, IhcOutputArray, 3, IhcInputArray, "resample");
-    sampIHC = mxGetPr(IhcOutputArray[0]);
+    // IhcInputArray[0] = mxCreateDoubleMatrix(1, k, mxREAL);
+    // ihcDims = mxGetPr(IhcInputArray[0]);
+    // for (i=0;i<k;++i)
+    //     ihcDims[i] = powerLawIn[i];
+    // IhcInputArray[1] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(IhcInputArray[1])= 1;
+    // IhcInputArray[2] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    // *mxGetPr(IhcInputArray[2])= resamp;
+    // mexCallMATLAB(1, IhcOutputArray, 3, IhcInputArray, "resample");
+    // sampIHC = mxGetPr(IhcOutputArray[0]);
+
+    sampIHC = decimate(k, powerLawIn, resamp);
 
     free(powerLawIn); free(mappingOut);
     /*----------------------------------------------------------*/
@@ -312,15 +316,26 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
         synout[i] = TmpSyn[i+delaypoint];
 
     free(synSampOut); free(TmpSyn);
-    mxDestroyArray(randInputArray[0]); mxDestroyArray(randOutputArray[0]);
-    mxDestroyArray(IhcInputArray[0]); mxDestroyArray(IhcOutputArray[0]); mxDestroyArray(IhcInputArray[1]); mxDestroyArray(IhcInputArray[2]);
-    mxDestroyArray(randInputArray[1]);mxDestroyArray(randInputArray[2]); mxDestroyArray(randInputArray[3]);
-    mxDestroyArray(randInputArray[4]);
+    free(randNums);
+    free(sampIHC);
+    // mxDestroyArray(randInputArray[0]); mxDestroyArray(randOutputArray[0]);
+    // mxDestroyArray(IhcInputArray[0]); mxDestroyArray(IhcOutputArray[0]); mxDestroyArray(IhcInputArray[1]); mxDestroyArray(IhcInputArray[2]);
+    // mxDestroyArray(randInputArray[1]);mxDestroyArray(randInputArray[2]); mxDestroyArray(randInputArray[3]);
+    // mxDestroyArray(randInputArray[4]);
     return((long) ceil(totalstim*nrep));
 }
 /* ------------------------------------------------------------------------------------ */
-/* Pass the output of Synapse model through the Spike Generator */
 
+
+/* CompareDouble function is used to replace a mexCallMatlab sort call */
+int CompareDouble (const void * a, const void * b)
+{
+    if ( *(double*)a <  *(double*)b ) return -1;
+    if ( *(double*)a == *(double*)b ) return 0;
+    if ( *(double*)a >  *(double*)b ) return 1;
+}
+
+/* Pass the output of Synapse model through the Spike Generator */
 int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_init, double tau, double t_rd_jump, int nSites, double tabs, double trel, double spont, int totalstim, int nrep,double total_mean_rate,long MaxArraySizeSpikes, double *sptime, double *trd_vector)
 {
 
@@ -338,7 +353,7 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
     long    MaxArraySizeEvents;
 
     /* Generating a vector of random numbers using mexCallMATLAB */
-    mxArray *randInputArray[1], *randOutputArray[1];
+    // mxArray *randInputArray[1], *randOutputArray[1];
     double *randDims, *randNums;
     long randBufIndex;
     long randBufLen;
@@ -355,7 +370,7 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
     double previous_redocking_period,  current_redocking_period;
     int oneSiteRedock_rounded, elapsed_time_rounded ;
 
-    mxArray *sortInputArray[1], *sortOutputArray[1];
+    // mxArray *sortInputArray[1], *sortOutputArray[1];
     double *sortDims, *preReleaseTimeBinsSorted;
 
     preRelease_initialGuessTimeBins = (double*)calloc(nSites, sizeof(double));
@@ -383,12 +398,13 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
 
     /* mexPrintf("randBufLen: %ld\n\n", randBufLen); */
 
-    randInputArray[0] = mxCreateDoubleMatrix(1, 2, mxREAL);
-    randDims = mxGetPr(randInputArray[0]);
-    randDims[0] = 1;
-    randDims[1] = randBufLen;
-    mexCallMATLAB(1, randOutputArray, 1, randInputArray, "rand");
-    randNums = mxGetPr(randOutputArray[0]);
+    // randInputArray[0] = mxCreateDoubleMatrix(1, 2, mxREAL);
+    // randDims = mxGetPr(randInputArray[0]);
+    // randDims[0] = 1;
+    // randDims[1] = randBufLen;
+    // mexCallMATLAB(1, randOutputArray, 1, randInputArray, "rand");
+    // randNums = mxGetPr(randOutputArray[0]);
+    randNums = generate_random_numbers(randBufLen);
     randBufIndex = 0;
 
 
@@ -408,20 +424,21 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
 
 
     /* Call Sort function using  */
-    sortInputArray[0] = mxCreateDoubleMatrix(1, nSites, mxREAL);
-    sortDims = mxGetPr(sortInputArray[0]);
-    for (i=0;i<nSites; i++)
-    {
-        sortDims[i] = preRelease_initialGuessTimeBins[i];
-
-    }
-
-    mexCallMATLAB(1, sortOutputArray, 1, sortInputArray, "sort");
-
-    /*Now Sort the four initial preRelease times and associate
-     * the farthest to zero as the site which has also generated a spike */
-
-    preReleaseTimeBinsSorted =  mxGetPr(sortOutputArray[0]);
+    // sortInputArray[0] = mxCreateDoubleMatrix(1, nSites, mxREAL);
+    // sortDims = mxGetPr(sortInputArray[0]);
+    // for (i=0;i<nSites; i++)
+    // {
+    //     sortDims[i] = preRelease_initialGuessTimeBins[i];
+    // }
+    //
+    // mexCallMATLAB(1, sortOutputArray, 1, sortInputArray, "sort");
+    //
+    // /*Now Sort the four initial preRelease times and associate
+    //  * the farthest to zero as the site which has also generated a spike */
+    //
+    // preReleaseTimeBinsSorted =  mxGetPr(sortOutputArray[0]);
+    qsort(preRelease_initialGuessTimeBins, nSites, sizeof(double), CompareDouble);
+    preReleaseTimeBinsSorted = preRelease_initialGuessTimeBins;
 
     /* Consider the inital previous_release_times to be  the preReleaseTimeBinsSorted *tdres */
     for (i=0; i<nSites; i++)
@@ -556,8 +573,8 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
     free(current_release_times);
     free(oneSiteRedock);
     free(Xsum);
-    mxDestroyArray(randInputArray[0]); mxDestroyArray(randOutputArray[0]);
-    mxDestroyArray(sortInputArray[0]); mxDestroyArray(sortOutputArray[0]);
+    // mxDestroyArray(randInputArray[0]); mxDestroyArray(randOutputArray[0]);
+    // mxDestroyArray(sortInputArray[0]); mxDestroyArray(sortOutputArray[0]);
     return (spCount);
 
 }
