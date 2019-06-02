@@ -19,6 +19,9 @@
  * (based on https://github.com/mrkrd/cochlea/blob/master/cochlea/zilany2014)
  */
 
+#include "Python.h"
+#include "cython_bez2018.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,19 +45,20 @@
 
 
 
-void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, double noiseType, double implnt, double spont, double tabs, double trel, double *meanrate, double *varrate, double *psth, double *synout, double *trd_vector, double *trel_vector)
+void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim,
+              double noiseType, double implnt, double spont, double tabs, double trel,
+              double *meanrate, double *varrate, double *psth, double *synout, double *trd_vector, double *trel_vector)
 {
-
     /*variables for the signal-path, control-path and onward */
     double *sptime;
     double  MeanISI;
     double  SignalLength;
     long    MaxArraySizeSpikes;
-    double tau,t_rd_rest,t_rd_init, t_rd_jump,trel_i;
-    int    nSites;
-    int    i,nspikes,ipst;
-    double I;
-    double sampFreq = 10e3; /* Sampling frequency used in the synapse */
+    double  tau,t_rd_rest,t_rd_init, t_rd_jump,trel_i;
+    int     nSites;
+    int     i,nspikes,ipst;
+    double  I;
+    double  sampFreq = 10e3; /* Sampling frequency used in the synapse */
     double  total_mean_rate;
     /* Declarations of the functions used in the program */
     double Synapse(double *, double, double, int, int, double, double,  double, double, double *);
@@ -79,8 +83,8 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
     tau =  60.0e-3;  /* Time constant for short-term adaptation (in mean redocking time) */
 
 
-    /* We register only the spikes at times after zero, the sufficient array size (more than 99.7% of cases) to register spike times  after zero is :/
-     * /*MaxN=signalLengthInSec/meanISI+ 3*sqrt(signalLengthInSec/MeanISI)= nSpike_average +3*sqrt(nSpike_average)*/
+    /* We register only the spikes at times after zero, the sufficient array size (more than 99.7% of cases) to register spike times  after zero is: */
+    /* MaxN=signalLengthInSec/meanISI+ 3*sqrt(signalLengthInSec/MeanISI)= nSpike_average +3*sqrt(nSpike_average) */
     MeanISI = (1/total_mean_rate)+ (t_rd_init)/nSites+tabs+trel;
     SignalLength = totalstim*nrep*tdres;
     MaxArraySizeSpikes= ceil ((long) (SignalLength/MeanISI + 3* sqrt(SignalLength/MeanISI)));
@@ -101,7 +105,6 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
     /* Calculate the analytical estimates of meanrate and varrate and wrapping them up based on no. of repetitions */
     for(i = 0; i<I ; i++)
     {
-
         ipst = (int) (fmod(i,totalstim));
         if (synout[i]>0)
         {
@@ -111,7 +114,7 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
             meanrate[ipst] = meanrate[ipst] + synout[i]/(synout[i]*(tabs + trd_vector[i]/nSites + trel_i) + 1)/nrep;  /* estimated instantaneous mean rate */
             varrate[ipst]  = varrate[ipst] + ((11*pow(synout[i],7)*pow(trd_vector[i],7))/2 + (3*pow(synout[i],8)*pow(trd_vector[i],8))/16 + 12288*pow(synout[i],2)*pow(trel_i,2) + trd_vector[i]*(22528*pow(synout[i],3)*pow(trel_i,2) + 22528*synout[i]) + pow(trd_vector[i],6)*(3*pow(synout[i],8)*pow(trel_i,2) + 82*pow(synout[i],6)) + pow(trd_vector[i],5)*(88*pow(synout[i],7)*pow(trel_i,2) + 664*pow(synout[i],5)) + pow(trd_vector[i],4)*(976*pow(synout[i],6)*pow(trel_i,2) + 3392*pow(synout[i],4)) + pow(trd_vector[i],3)*(5376*pow(synout[i],5)*pow(trel_i,2) + 10624*pow(synout[i],3)) + pow(trd_vector[i],2)*(15616*pow(synout[i],4)*pow(trel_i,2) + 20992*pow(synout[i],2)) + 12288)/(pow(synout[i],2)*pow(synout[i]*trd_vector[i] + 4,4)*(3*pow(synout[i],2)*pow(trd_vector[i],2) + 40*synout[i]*trd_vector[i] + 48)*pow(trd_vector[i]/4 + tabs + trel_i + 1/synout[i],3))/nrep; /* estimated instananeous variance in the discharge rate */
         }
-               else
+        else
             trel_vector[i] = trel;
     };
 
@@ -124,8 +127,10 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
 
 } /* End of the SingleAN function */
 
-/* --------------------------------------------------------------------------------------------*/
-double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep, double spont, double noiseType, double implnt, double sampFreq, double *synout)
+
+
+double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
+               double spont, double noiseType, double implnt, double sampFreq, double *synout)
 {
     /* Initalize Variables */
     int z, b;
@@ -145,7 +150,7 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     double *randNums;
 
     // mxArray	*IhcInputArray[3], *IhcOutputArray[1];
-    double *sampIHC, *ihcDims;
+    double *sampIHC; // *ihcDims;
 
     mappingOut = (double*)calloc((long) ceil(totalstim*nrep),sizeof(double));
     powerLawIn = (double*)calloc((long) ceil(totalstim*nrep+3*delaypoint),sizeof(double));
@@ -227,9 +232,7 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     // *mxGetPr(IhcInputArray[2])= resamp;
     // mexCallMATLAB(1, IhcOutputArray, 3, IhcInputArray, "resample");
     // sampIHC = mxGetPr(IhcOutputArray[0]);
-
     sampIHC = decimate(k, powerLawIn, resamp);
-
     free(powerLawIn); free(mappingOut);
     /*----------------------------------------------------------*/
     /*----- Running Power-law Adaptation -----------------------*/
@@ -299,6 +302,7 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
         synSampOut[k] = sout1[k] + sout2[k];
         k = k+1;
     }   /* end of all samples */
+
     free(sout1); free(sout2);
     free(m1); free(m2); free(m3); free(m4); free(m5); free(n1); free(n2); free(n3);
     /*----------------------------------------------------------*/
@@ -323,8 +327,8 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     // mxDestroyArray(randInputArray[1]);mxDestroyArray(randInputArray[2]); mxDestroyArray(randInputArray[3]);
     // mxDestroyArray(randInputArray[4]);
     return((long) ceil(totalstim*nrep));
-}
-/* ------------------------------------------------------------------------------------ */
+} /* End of the Synapse function */
+
 
 
 /* CompareDouble function is used to replace a mexCallMatlab sort call */
@@ -335,10 +339,13 @@ int CompareDouble (const void * a, const void * b)
     if ( *(double*)a >  *(double*)b ) return 1;
 }
 
-/* Pass the output of Synapse model through the Spike Generator */
-int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_init, double tau, double t_rd_jump, int nSites, double tabs, double trel, double spont, int totalstim, int nrep,double total_mean_rate,long MaxArraySizeSpikes, double *sptime, double *trd_vector)
-{
 
+
+/* Pass the output of Synapse model through the Spike Generator */
+int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_init, double tau,
+                   double t_rd_jump, int nSites, double tabs, double trel, double spont, int totalstim,
+                   int nrep, double total_mean_rate, long MaxArraySizeSpikes, double *sptime, double *trd_vector)
+{
     /* Initializing the variables: */
 
     double*  preRelease_initialGuessTimeBins;
@@ -354,7 +361,7 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
 
     /* Generating a vector of random numbers using mexCallMATLAB */
     // mxArray *randInputArray[1], *randOutputArray[1];
-    double *randDims, *randNums;
+    double *randNums; // *randDims,
     long randBufIndex;
     long randBufLen;
 
@@ -371,7 +378,7 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
     int oneSiteRedock_rounded, elapsed_time_rounded ;
 
     // mxArray *sortInputArray[1], *sortOutputArray[1];
-    double *sortDims, *preReleaseTimeBinsSorted;
+    double *preReleaseTimeBinsSorted; // *sortDims,
 
     preRelease_initialGuessTimeBins = (double*)calloc(nSites, sizeof(double));
     unitRateInterval                = (int*)calloc(nSites, sizeof(double));;
@@ -383,8 +390,8 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
 
     /* Estimating Max number of spikes and events (including before zero elements)  */
     MeanInterEvents = (1/total_mean_rate)+ (t_rd_init)/nSites;
-    /* The sufficient array size (more than 99.7% of cases) to register event times  after zero is :/
-     * /*MaxN=signalLengthInSec/meanEvents+ 3*sqrt(signalLengthInSec/MeanEvents)*/
+    /* The sufficient array size (more than 99.7% of cases) to register event times  after zero is : */
+    /* MaxN=signalLengthInSec/meanEvents+ 3*sqrt(signalLengthInSec/MeanEvents) */
 
     MaxArraySizeEvents= ceil ((long) (totalstim*nrep*tdres/MeanInterEvents+ 3 * sqrt(totalstim*nrep*tdres/MeanInterEvents)))+nSites;
 
@@ -577,4 +584,4 @@ int SpikeGenerator(double *synout, double tdres, double t_rd_rest, double t_rd_i
     // mxDestroyArray(sortInputArray[0]); mxDestroyArray(sortOutputArray[0]);
     return (spCount);
 
-}
+} /* End of the SpikeGenerator function */

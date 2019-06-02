@@ -7,6 +7,10 @@ include_dirs = []
 include_dirs.append(numpy.get_include())
 
 extensions = []
-extensions.append(Extension("test_by_mark", ["test_by_mark.pyx", "complex.c", "model_IHC_BEZ2018.c", "model_Synapse_BEZ2018.c"]))
+extensions.append(Extension("cython_bez2018",
+                            ["cython_bez2018.pyx",
+                             "complex.c",
+                             "model_IHC_BEZ2018.c",
+                             "model_Synapse_BEZ2018.c"]))
 
 setup(ext_modules=cythonize(extensions), include_dirs=include_dirs)

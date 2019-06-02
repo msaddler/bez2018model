@@ -1,8 +1,8 @@
 #ifndef _COMPLEX_HPP
 #define _COMPLEX_HPP
 
-/* COMPLEX.HPP header file		
- * use for complex arithmetic in C 
+/* COMPLEX.HPP header file
+ * use for complex arithmetic in C
  (part of them are from "C Tools for Scientists and Engineers" by L. Baker)
 */
 
@@ -21,7 +21,7 @@ typedef struct __COMPLEX COMPLEX;
 #define CDRN(X,Y) ((X).x*(Y).x+(Y).y*(X).y)
 /* used in the Division : image part of the division */
 #define CDIN(X,Y) ((X).y*(Y).x-(X).x*(Y).y)
-/*  used in the Division : denumerator of the division */
+/* used in the Division : denumerator of the division */
 #define CNORM(X) ((X).x*(X).x+(X).y*(X).y)
 /* real part of the complex */
 #define CREAL(X) (double((X).x))
