@@ -47,10 +47,10 @@ def apply_lowpass_filter(x, fs, axis=1, order=6, cutoff=0):
     return x
 
 
-def meanrates_nervegram(signal, signal_fs, meanrates_params={}, ANmodel_params={},
+def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={},
                         lpfilter_params={}, random_seed=None):
     '''
-    Main function for generating an "auditory nervegram" using the meanrates output
+    Main function for generating an auditory nervegram using the meanrates output
     from the BEZ2018 ANmodel (analytic estimate of instantaneous firing rate).
     
     Args
