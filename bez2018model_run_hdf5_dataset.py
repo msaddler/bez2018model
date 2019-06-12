@@ -8,7 +8,6 @@ import glob
 import dask.array
 
 
-
 def write_example_to_hdf5(hdf5_f, data_dict, idx, data_key_pair_list=[]):
     '''
     Write individual example to open hdf5 file.
@@ -149,7 +148,7 @@ def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_ste
                                  kwargs_check_continuation={},
                                  kwargs_initialization={}):
     '''
-    Routine for generating BEZ2018 ANmodel nervegrams and writing to hdf5 dataset
+    Main routine for generating BEZ2018 ANmodel nervegrams and writing outputs to hdf5 file.
     
     Args
     ----
@@ -225,8 +224,8 @@ def run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=0
                            source_key_signal='/signal', source_key_signal_fs='/signal_rate',
                            source_keys_to_copy=[], **kwargs):
     '''
-    Read stimuli from hdf5 file, generate ANmodel nervegrams, and copy
-    specified datasets from source to destination hdf5 file.
+    Read stimuli from hdf5 file, generate ANmodel nervegrams, and copy specified datasets
+    from source to destination hdf5 file.
     
     Args
     ----
@@ -273,7 +272,7 @@ def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs
                                     source_key_signal='/signal', source_key_signal_fs='/signal_rate',
                                     source_keys_to_copy=[], **kwargs):
     '''
-    Wrapper to make running `run_dataset_generation()` in parallel straightforward.
+    Wrapper function to easily parallelize `run_dataset_generation()`.
     
     Args
     ----
@@ -301,7 +300,7 @@ def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs
     idx_end = idx_splits[(job_idx % jobs_per_source_file) + 1]
     source_hdf5_f.close()
     
-    # Design unique dest_hdf5_filename
+    # Design unique destination hdf5 filename
     sidx = dest_filename.rfind('.')
     if len(source_fn_list) == 1:
         dest_hdf5_filename = dest_filename[:sidx] + '_{:06d}-{:06d}' + dest_filename[sidx:]
@@ -310,7 +309,7 @@ def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs
         dest_hdf5_filename = dest_filename[:sidx] + '_{:03}_{:06d}-{:06d}' + dest_filename[sidx:]
         dest_hdf5_filename = dest_hdf5_filename.format(source_file_idx, idx_start, idx_end)
     
-    # Run the dataset generation function
+    # Call `run_dataset_generation()` to launch the nervegram generation routine
     print('>>> [PARALLEL_RUN] job_idx: {}, source_file_idx: {} of {}, jobs_per_source_file: {}'.format(
         job_idx, source_file_idx, len(source_fn_list), jobs_per_source_file))
     print('>>> [PARALLEL_RUN] source_hdf5_filename: {}'.format(source_hdf5_filename))
