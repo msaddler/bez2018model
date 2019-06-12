@@ -1,288 +1,320 @@
 import sys
 import os
 import bez2018model
-import pdb
 import numpy as np
 import h5py
-import dask.array as da
+import warnings
 import glob
+import dask.array
 
 
-''' NOT YET FUNCTIONAL '''
 
-
-def write_example_to_hdf5(hdf5_f, out, idx, key_pair_list=[]):
+def write_example_to_hdf5(hdf5_f, data_dict, idx, data_key_pair_list=[]):
     '''
     Write individual example to open hdf5 file.
     
     Args
     ----
     hdf5_f (h5py.File object): open and writeable hdf5 file object
-    out (dict): dict containing auditory nerve model output
+    data_dict (dict): dict containing auditory nerve model output
     idx (int): specifies row of hdf5 file to write to
-    key_pair_list (list): list of tuples (hdf5_key, out_key)
+    data_key_pair_list (list): list of tuples (hdf5_key, data_key)
     '''
-    for (hdf5_key, out_key) in key_pair_list: hdf5_f[hdf5_key][idx] = np.array(out[out_key])
+    for (hdf5_key, data_key) in data_key_pair_list:
+        hdf5_f[hdf5_key][idx] = np.squeeze(np.array(data_dict[data_key]))
 
 
-def initialize_hdf5_file(hdf5_filename, N, out, out_key_pair_list=[], config_key_pair_list=[]):
+def initialize_hdf5_file(hdf5_filename, N, data_dict, file_mode='w',
+                         data_key_pair_list=[], config_key_pair_list=[],
+                         dtype=np.float32, cast_data=True, cast_config=False):
     '''
-    Create a new hdf5 file and populate config params (overwrite if file exists).
+    Create a new hdf5 file and populate config parameters.
     
     Args
     ----
     hdf5_filename (str): filename for new hdf5 file
-    N (int): number of examples that will be written to file
-    out (dict): dict containing auditory nerve model output
-    out_key_pair_list (list): list of tuples (hdf5_key, out_key) for datasets with `N` rows
-    config_key_pair_list (list): list of tuples (hdf5_key, out_key) for config datasets
+    N (int): number of examples that will be written to file (number of rows for datasets)
+    data_dict (dict): dict containing auditory nerve model output and all metadata
+    file_mode (str): 'w' = Create file, truncate if exists; 'w-' = Create file, fail if exists
+    data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
+    config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
+    dtype (np.dtype object): datatype for casting data and/or config values
+    cast_data (bool): if True, fields corresponding to data_key_pair_list will be cast to dtype
+    cast_config (bool): if True, fields corresponding to config_key_pair_list will be cast to dtype
     '''
     # Initialize hdf5 file
-    f = h5py.File(hdf5_filename, 'w')
+    f = h5py.File(hdf5_filename, file_mode)
     # Create the main output datasets
-    for (hdf5_key, out_key) in out_key_pair_list:
-        out_key_value = np.squeeze(np.array(out[out_key])).astype(np.float32)
-        out_key_shape = [N] + list(out_key_value.shape)
-        f.create_dataset(hdf5_key, out_key_shape, dtype=out_key_value.dtype)
-    # Create and populate teh config datasets
-    for (hdf5_key, out_key) in config_key_pair_list:
-        out_key_value = np.squeeze(np.array(out[out_key])).astype(np.float32)
-        out_key_shape = [1] + list(out_key_value.shape)
-        f.create_dataset(hdf5_key, out_key_shape, dtype=out_key_value.dtype, data=out_key_value)
+    for (hdf5_key, data_key) in data_key_pair_list:
+        data_key_value = np.squeeze(np.array(data_dict[data_key]))
+        if cast_data: data_key_value = data_key_value.astype(dtype)
+        data_key_shape = [N] + list(data_key_value.shape)
+        f.create_dataset(hdf5_key, data_key_shape, dtype=data_key_value.dtype)
+    # Create and populate the config datasets
+    for (hdf5_key, config_key) in config_key_pair_list:
+        config_key_value = np.squeeze(np.array(data_dict[config_key]))
+        if cast_config: config_key_value = config_key_value.astype(dtype)
+        config_key_shape = [1] + list(config_key_value.shape)
+        f.create_dataset(hdf5_key, config_key_shape, dtype=config_key_value.dtype,
+                         data=config_key_value)
     # Close the initialized hdf5 file
     f.close()
 
 
-def generate_nervegrams(dest_filename, signal_list, signal_Fs, disp_step=10,
-                        out_key_pair_list=[], config_key_pair_list=[],
-                        output_params={}, ANmodel_params={}, manipulation_params={}):
+def check_continuation(hdf5_filename, check_key='/pin_dBSPL', check_key_fill_value=0,
+                       repeat_buffer=1):
     '''
-    Runs the auditory nerve model and stores auditory nervegrams in `dest_filename`.
+    This function checks if the output dataset already exists and should be continued
+    from the last populated row rather than restarted.
     
     Args
     ----
+    hdf5_filename (str): filename for hdf5 dataset to check
+    check_key (str): key in hdf5 file used to check for continuation (should be 1-dimensional dataset)
+    check_key_fill_value (int or float): function will check for rows where check_key is equal to this value
+    repeat_buffer (int): if continuing existing file, number of rows should be re-processed
     
     Returns
     -------
+    continuation_flag (bool): True if hdf5 file exists and can be continued
+    start_idx (int or None): row of hdf5 dataset at which to begin continuation
     '''
-    
-    ### Determine if hdf5 file needs to be initialized and get start_index
-    try:
-        f = h5py.File(dest_filename, 'r+') # Attempt to open the output hdf5 file
-        start_index = np.reshape(np.argwhere(f['/pin_dBSPL'][:] == 0), (-1,))
-        if len(start_index) == 0: # Quit if file is complete
-            f.close()
-            print('>>> FILE FOUND: no indexes remain')
-            return
+    continuation_flag = False
+    start_idx = 0
+    if os.path.isfile(hdf5_filename):
+        f = h5py.File(hdf5_filename, 'r')
+        if check_key in f:
+            candidate_idxs = np.reshape(np.argwhere(f[check_key][:] == check_key_fill_value), [-1])
+            continuation_flag = True
+            if len(candidate_idxs > 0): start_idx = np.max([0, np.min(candidate_idxs)-repeat_buffer])
+            else: start_idx = None
         else:
-            start_index = np.max([0, start_index[0]-1]) # Start 1 signal before to be safe
-            print('>>> FILE FOUND: starting at index {}'.format(start_index))
-        init_flag = False
-    except: # Initialize new hdf5 file if the specified one does not exist
-        init_flag = True
-        start_index = 0
+            warnings.warn('<<< check_key not found in hdf5 file; hdf5 dataset will be restarted >>>')
+        f.close()
+    return continuation_flag, start_idx
+
+
+def get_default_data_key_pair_list(data_dict, hdf5_key_prefix='',
+                                   data_keys=['meanrates', 'signal', 'pin_dBSPL']):
+    '''
+    Helper function to get default data_key_pair_list from data_dict.
     
-    ### Start MATLAB engine and run each signal through the auditory nerve model
-    eng = bez2018model.start_matlab_engine()
-    N = signal_list.shape[0]
-    for idx in range(start_index, N):
-        # Compute bez2018model output on every iteration
-        out = bez2018model.generate_nervegram(eng, signal_list[idx], signal_Fs, output_params,
-                                              ANmodel_params, manipulation_params)
-        # Initialize the hdf5 file on the first iteration
-        if init_flag:
-            print('>>> INITIALIZING:', dest_filename)
-            initialize_hdf5_file(dest_filename, N, out,
-                                 out_key_pair_list=out_key_pair_list,
-                                 config_key_pair_list=config_key_pair_list)
-            f = h5py.File(dest_filename, 'r+')
-            init_flag = False
-        # Write the bez2018model output to hdf5 file on every iteration
-        write_example_to_hdf5(f, out, idx, key_pair_list=out_key_pair_list)
-        # Close and re-open hdf5 file to checkpoint every `disp_step` iterations
-        if idx % disp_step == 0:
-            f.close()
-            f = h5py.File(dest_filename, 'r+')
-            print('... signal {} of {}'.format(idx, N))
+    Args
+    ----
+    data_dict (dict): dict containing auditory nerve model output and all metadata
+    hdf5_key_prefix (str): prefix added to hdf5 keys in data_key_pair_list
+    data_keys (list): keys in data_dict that should be added to data_key_pair_list
     
-    ### Close the hdf5 file and quit the MATLAB engine
-    f.close()
-    bez2018model.quit_matlab_engine(eng)
-
-
-def get_ERB_CF_list(num_CFs, min_CF=125., max_CF=10e3):
+    Returns
+    -------
+    data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
     '''
-    Helper function to get array of num_CFs ERB-scaled CFs between min_CF and max_CF.
-    '''
-    E_start = 21.4 * np.log10(0.00437 * min_CF + 1.0)
-    E_end = 21.4 * np.log10(0.00437 * max_CF + 1.0)
-    CF_list = np.linspace(E_start, E_end, num = num_CFs)
-    CF_list = (1.0/0.00437) * (10.0 ** (CF_list / 21.4) - 1.0)
-    return list(CF_list)
+    data_key_pair_list = []
+    for key in data_dict.keys():
+        if key in data_keys:
+            data_key_pair_list.append((hdf5_key_prefix + key, key))
+    return data_key_pair_list
 
 
-def get_bez2018model_ANmodel_params(num_CFs=40, min_CF=125., max_CF=8e3, spont_list=[70.],
-                                    cohc=1., cihc=1., species=2.):
+def get_default_config_key_pair_list(data_dict, hdf5_key_prefix='config_bez2018model/',
+                                     ignore_keys=['meanrates', 'signal', 'pin', 'pin_dBSPL'],
+                                     flat_keyparts=['_fs', '_list']):
     '''
-    Helper function to get reasonable ANmodel_params for bez2018model.
-    '''
-    ANmodel_params = {}
-    ANmodel_params['CF_list'] = get_ERB_CF_list(num_CFs, min_CF=min_CF, max_CF=max_CF)
-    ANmodel_params['spont_list'] = spont_list
-    ANmodel_params['cohc'] = cohc
-    ANmodel_params['cihc'] = cihc
-    ANmodel_params['species'] = species
-    return ANmodel_params
-
-
-def get_bez2018model_output_params(meanrates_dur=2., meanrates_Fs=10e3, set_dBSPL_flag=0,
-                                   buffer_front_dur=0.070, buffer_end_dur=0.010):
-    '''
-    Helper function to get reasonable output_params for bez2018model.
-    '''
-    output_params = {}
-    output_params['meanrates_dur'] = meanrates_dur
-    output_params['meanrates_Fs'] = meanrates_Fs
-    output_params['set_dBSPL_flag'] = set_dBSPL_flag
-    output_params['buffer_front_dur'] = buffer_front_dur
-    output_params['buffer_end_dur'] = buffer_end_dur
-    return output_params
-
-
-def get_bez2018model_manipulation_params():
-    '''
-    Helper function to get reasonable manipulation_params for bez2018model.
-    '''
-    manipulation_params = {}
-    return manipulation_params
-
-
-def get_config_key_pair_list(ANmodel_params, output_params):
-    '''
-    Helper function to get config_key_pair_list.
+    Helper function to get default config_key_pair_list.
+    
+    Args
+    ----
+    data_dict (dict): dict containing auditory nerve model output and all metadata
+    hdf5_key_prefix (str): prefix added to hdf5 keys in config_key_pair_list
+    ignore_keys (list): keys in data_dict that should NOT be added to config_key_pair_list
+    flat_keyparts (list): substrings indicating which config keys should be added without prefix
+    
+    Returns
+    -------
+    config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
     '''
     config_key_pair_list = []
-    for key in list(ANmodel_params.keys()) + list(output_params.keys()):
-        config_key_pair_list.append(('/config_ANmodel/'+key, key))
+    for key in data_dict.keys():
+        if not key in ignore_keys:
+            if any([keypart in key for keypart in flat_keyparts]): 
+                config_key_pair_list.append((key, key))
+            else:
+                config_key_pair_list.append((hdf5_key_prefix + key, key))
     return config_key_pair_list
 
 
-def get_out_key_pair_list():
+def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_step=10,
+                                 data_key_pair_list=[], config_key_pair_list=[],
+                                 kwargs_nervegram_meanrates={},
+                                 kwargs_check_continuation={},
+                                 kwargs_initialization={}):
     '''
-    Helper function to get out_key_pair_list.
+    Routine for generating BEZ2018 ANmodel nervegrams and writing to hdf5 dataset
+    
+    Args
+    ----
+    hdf5_filename (str): filename for hdf5 dataset in which to store ANmodel outputs
+    signal_list (np array): stimuli to pass through ANmodel (signal index by time array)
+    signal_fs (int): sampling rate of singals in signal_list (Hz)
+    disp_step (int): every disp_step, progress is displayed and hdf5 file is checkpointed
+    data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
+    config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
+    kwargs_nervegram_meanrates (dict or list of dicts): kwargs for `bez2018model.nervegram_meanrates()`
+    kwargs_check_continuation (dict): kwargs for `check_continuation()`
+    kwargs_initialization (dict): kwargs for `initialize_hdf5_file()`
     '''
-    out_key_pair_list = []
-    for key in ['meanrates', 'meanrates_clip_indexes', 'pin_dBSPL']:
-        out_key_pair_list.append(('/'+key, key))
-    return out_key_pair_list
+    # Calculate total number of signals and convert kwargs_nervegram_meanrates to list if needed
+    N = signal_list.shape[0]
+    if not isinstance(kwargs_nervegram_meanrates, list):
+        kwargs_nervegram_meanrates = [kwargs_nervegram_meanrates] * N
+    assert len(kwargs_nervegram_meanrates) == N, "nervegram parameter list must have length N"
+    
+    # Check if the hdf5 output dataset can be continued and get correct start_idx
+    continuation_flag, start_idx = check_continuation(hdf5_filename, **kwargs_check_continuation)
+    if start_idx is None:
+        print('>>> [EXITING] No indexes remain in {}'.format(hdf5_filename))
+        return
+    
+    # Open hdf5 file if continuing existing dataset
+    if continuation_flag:
+        print('>>> [CONTINUING] {} from index {}'.format(hdf5_filename, start_idx))
+        hdf5_f = h5py.File(hdf5_filename, 'r+')
+    
+    # Main loop: iterate over all signals
+    for idx in range(start_idx, N):
+        
+        # Run stimulus through ANmodel and generate meanrates nervegram
+        data_dict = bez2018model.nervegram_meanrates(signal_list[idx], signal_fs,
+                                                     **kwargs_nervegram_meanrates[idx])
+        
+        # If key pair lists are empty, get reasonable defaults
+        if len(data_key_pair_list) == 0:
+            print('>>> [WARNING] Using default data_key_pair_list')
+            data_key_pair_list = get_default_data_key_pair_list(data_dict)
+        if len(config_key_pair_list) == 0:
+            print('>>> [WARNING] Using default config_key_pair_list')
+            config_key_pair_list = get_default_config_key_pair_list(data_dict)
+        
+        # If output hdf5 file dataset has not been initialized, do so on first iteration
+        if not continuation_flag:
+            print('>>> [INITIALIZING] {}'.format(hdf5_filename))
+            assert idx == 0, "hdf5 dataset should only be initialized when idx=0"
+            initialize_hdf5_file(hdf5_filename, N, data_dict,
+                                 data_key_pair_list=data_key_pair_list,
+                                 config_key_pair_list=config_key_pair_list,
+                                 **kwargs_initialization)
+            continuation_flag = True
+            hdf5_f = h5py.File(hdf5_filename, 'r+')
+        
+        # Write the ANmodel outputs to the hdf5 dataset
+        write_example_to_hdf5(hdf5_f, data_dict, idx,
+                              data_key_pair_list=data_key_pair_list)
+        
+        # Display progress and close/re-open hdf5 dataset
+        if idx % disp_step == 0:
+            hdf5_f.close()
+            hdf5_f = h5py.File(hdf5_filename, 'r+')
+            print('... signal {} of {}'.format(idx, N))
+    
+    # Close the hdf5 dataset for the last time
+    hdf5_f.close()
+    print('>>> [COMPLETING] {}'.format(hdf5_filename))
 
 
-def main(source_f, dest_filename, idx_start=0, idx_end=None, disp_step=5,
-         source_f_signal_list_key='/pin', source_f_signal_Fs_key='/signal_rate',
-         kwargs_ANmodel_params={}, kwargs_output_params={}, kwargs_manipulation_params={}):
+def run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=0, idx_end=None,
+                           source_key_signal='/signal', source_key_signal_fs='/signal_rate',
+                           source_keys_to_copy=[], **kwargs):
+    '''
+    Read stimuli from hdf5 file, generate ANmodel nervegrams, and copy
+    specified datasets from source to destination hdf5 file.
     
-    # Use the helper functions to get the arguments for `generate_nervegrams`
-    ANmodel_params = get_bez2018model_ANmodel_params(**kwargs_ANmodel_params)
-    output_params = get_bez2018model_output_params(**kwargs_output_params)
-    manipulation_params = get_bez2018model_manipulation_params(**kwargs_manipulation_params)
-    out_key_pair_list = get_out_key_pair_list()
-    config_key_pair_list = get_config_key_pair_list(ANmodel_params, output_params)
+    Args
+    ----
+    source_hdf5_filename (str): filename for hdf5 dataset providing the stimuli
+    dest_hdf5_filename (str): filename for hdf5 dataset in which to store ANmodel outputs
+    idx_start (int): specifies first stimulus in source_hdf5_filename to process
+    idx_end (int or None): upper limit of stimulus range in source_hdf5_filename to process
+    source_key_signal (str): key for stimulus dataset in source_hdf5_filename
+    source_key_signal_fs (str): key for stimulus sampling rate in source_hdf5_filename
+    source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
+    **kwargs (passed directly to `generate_nervegram_meanrates()`)
+    '''
+    # Ensure source and destination filenames are different and open the source hdf5 file
+    assert not source_hdf5_filename == dest_hdf5_filename, "source and dest hdf5 files must be different"
+    source_hdf5_f = h5py.File(source_hdf5_filename, 'r')
     
-    # Collect the signal inputs and sampling rate for `generate_nervegrams`
-    if (idx_end == None) or (idx_end > source_f[source_f_signal_list_key].shape[0]):
-        idx_end = source_f[source_f_signal_list_key].shape[0]
+    # Collect signal inputs and sampling rate from the source hdf5 file
+    if (idx_end == None) or (idx_end > source_hdf5_f[source_key_signal].shape[0]):
+        idx_end = source_hdf5_f[source_key_signal].shape[0]
     assert idx_start < idx_end, 'idx_start must be less than idx_end'
-    signal_list = source_f[source_f_signal_list_key][idx_start : idx_end]
-    signal_Fs = source_f[source_f_signal_Fs_key][0]
+    signal_list = source_hdf5_f[source_key_signal][idx_start:idx_end]
+    signal_fs = source_hdf5_f[source_key_signal_fs][0]
     
-    # Collect the datasets that will be copied directly from `source_f`
-    keys_to_copy = ['/noise_condition', '/phone_labels_unaligned', '/phoneme_labels_unaligned', '/snr',
-                    source_f_signal_Fs_key, source_f_signal_list_key]
+    # Run the main ANmodel nervegram generation routine
+    print('>>> [START] {}'.format(dest_hdf5_filename))
+    generate_nervegram_meanrates(dest_hdf5_filename, signal_list, signal_fs, **kwargs)
+    
+    # Copy specified datasets from source hdf5 file to destination hdf5 file
     dsets_to_copy = {}
-    for key in keys_to_copy:
-        if key in source_f:
-            if source_f[key].shape[0] == 1: key_dset = source_f[key]
-            else: key_dset = source_f[key][idx_start : idx_end]
-            dsets_to_copy[key] = da.from_array(key_dset, chunks=key_dset.shape)
+    for key in source_keys_to_copy:
+        if key in source_hdf5_f:
+            if source_hdf5_f[key].shape[0] == 1: key_dset = source_hdf5_f[key]
+            else: key_dset = source_hdf5_f[key][idx_start : idx_end]
+            dsets_to_copy[key] = dask.array.from_array(key_dset, chunks=key_dset.shape)
+            print('>>> [COPYING FROM SOURCE]: {}'.format(key), dsets_to_copy[key].shape)
+    if dsets_to_copy: dask.array.to_hdf5(dest_hdf5_filename, dsets_to_copy)
     
-    # Call function to run the auditory nerve model and write outputs to `dest_filename`
-    generate_nervegrams(dest_filename, signal_list, signal_Fs, disp_step=disp_step,
-                        out_key_pair_list=out_key_pair_list,
-                        config_key_pair_list=config_key_pair_list,
-                        output_params=output_params,
-                        ANmodel_params=ANmodel_params,
-                        manipulation_params=manipulation_params)
-    
-    # Copy the datasets specified earlier directly from `source_f` to `dest_filename`
-    for key in dsets_to_copy: print('COPYING: {}'.format(key), dsets_to_copy[key].shape)
-    da.to_hdf5(dest_filename, dsets_to_copy)
-    source_f.close()
+    # Close the source hdf5 file
+    source_hdf5_f.close()
+    print('>>> [END] {}'.format(dest_hdf5_filename))
 
 
-if __name__ == "__main__":
+def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs_per_source_file=10,
+                                    source_key_signal='/signal', source_key_signal_fs='/signal_rate',
+                                    source_keys_to_copy=[], **kwargs):
+    '''
+    Wrapper to make running `run_dataset_generation()` in parallel straightforward.
     
-    assert len(sys.argv) >= 3, 'Required command line arguments are: <job_id> <N>'
-    job_id = int(sys.argv[1])
-    N = int(sys.argv[2])
-    
-    # Determine source filename and start_idx / end_idx from source_regex and dset_start_idx
-#     source_regex = ('/om2/user/msaddler/hearing_impaired_networks/timit/sr20000/train_snr-10to+10/'
-#                     'timitWithAudiosetNoise_*.hdf5')
-#     source_regex = '/om2/user/msaddler/hearing_impaired_networks/timit/sr20000/test_behavioral_validation/timitWithAudiosetNoise_snr-10to+10_*.hdf5'
-    source_regex = '/om2/user/msaddler/hearing_impaired_networks/timit/sr20000/test_behavioral/*.hdf5'
-    
-    ### CALCULATE INDEXES FOR TRAINING / VALIDATION DATA
-#     source_fn_list = sorted(glob.glob(source_regex))
-#     source_file_bin_starts = []
-#     source_file_bin_ends = []
-#     dset_start_idx = job_id * N
-#     for source_fn in source_fn_list:
-#         [dsi, dei] = [int(x) for x in os.path.basename(source_fn)[-18:-5].split('-')]
-#         source_file_bin_starts.append(dsi)
-#         source_file_bin_ends.append(dei)
-#     source_file_idx = np.digitize(dset_start_idx, source_file_bin_starts) - 1
-#     source_fn = source_fn_list[source_file_idx]
-#     idx_start = dset_start_idx - source_file_bin_starts[source_file_idx]
-#     max_idx_end = source_file_bin_ends[source_file_idx] - source_file_bin_starts[source_file_idx]
-#     idx_end = min(idx_start + N, max_idx_end)
-    
-    ### CALCULATE INDEXES FOR TEST BEHAVIORAL
-    job_idx = job_id
+    Args
+    ----
+    source_regex (str): regular expression that globs all source hdf5 filenames
+    dest_filename (str): filename for output hdf5 file (indexes will be added for parallel outputs)
+    job_idx (int): index of current job
+    jobs_per_source_file (int): number of jobs each source file is split into
+    source_key_signal (str): key for stimulus dataset in source_hdf5_filename
+    source_key_signal_fs (str): key for stimulus sampling rate in source_hdf5_filename
+    source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
+    **kwargs (passed directly to `generate_nervegram_meanrates()`)
+    '''
+    # Determine the source_hdf5_filename using source_regex, job_idx, and jobs_per_source_file
     source_fn_list = sorted(glob.glob(source_regex))
-    examples_per_source_file = 3460
-    jobs_per_source_file = np.ceil(examples_per_source_file/N).astype(int)
+    assert len(source_fn_list) > 0, "source_regex did not match any files"
     source_file_idx = job_idx // jobs_per_source_file
-    idx_start = N * (job_idx % jobs_per_source_file)
-    idx_end = min(idx_start + N, examples_per_source_file)
-    dset_start_idx = idx_start
-    source_fn = source_fn_list[source_file_idx]
+    assert source_file_idx < len(source_fn_list), "source_file_idx out of range"
+    source_hdf5_filename = source_fn_list[source_file_idx]
     
-    # Load the source file and name the destination file
-    print('<SOURCE>', source_fn)
-    print('<SOURCE idx_start, idx_end>', idx_start, idx_end)
-    source_f = h5py.File(source_fn, 'r')
+    # Compute idx_start and idx_end within source_hdf5_filename for the given job_idx
+    source_hdf5_f = h5py.File(source_hdf5_filename, 'r')
+    N = source_hdf5_f[source_key_signal].shape[0]
+    idx_splits = np.linspace(0, N, jobs_per_source_file + 1, dtype=int)
+    idx_start = idx_splits[job_idx % jobs_per_source_file]
+    idx_end = idx_splits[(job_idx % jobs_per_source_file) + 1]
+    source_hdf5_f.close()
     
-    ### DESTINATION FILENAME FOR TEST BEHAVIORAL
-    dest_dir = '/om/scratch/Wed/msaddler/data_6345proj/timit/sr20000/bez2018_coch1_test_behavioral/'
-    if len(sys.argv) == 4:
-        dest_dir = str(sys.argv[3])
-        print('using command line specified dest_dir:', dest_dir)
-    dest_filename = os.path.join(dest_dir, os.path.basename(source_fn))
-    dest_filename = dest_filename.replace(dest_filename[-18:-5], '{:06}-{:06}')
-    
-    ### DESTINATION FILENAME FOR TRAINING / VALIDATION
-#     dest_filename = ('/om/scratch/Wed/msaddler/data_6345proj/timit/sr20000/bez2018_coch0_train_snr-10to+10/'
-#                      'timitWithAudiosetNoise_{:06}-{:06}.hdf5')
-    
-    dest_filename = dest_filename.format(dset_start_idx, dset_start_idx+idx_end-idx_start)
-    if 'coch0' in dest_filename:
-        kwargs_ANmodel_params={'cohc':0.0} # <--- QUICK PATCH to set ANmodel_params
-        print('kwargs_ANmodel_params', kwargs_ANmodel_params)
+    # Design unique dest_hdf5_filename
+    sidx = dest_filename.rfind('.')
+    if len(source_fn_list) == 1:
+        dest_hdf5_filename = dest_filename[:sidx] + '_{:06d}-{:06d}' + dest_filename[sidx:]
+        dest_hdf5_filename = dest_hdf5_filename.format(idx_start, idx_end)
     else:
-        kwargs_ANmodel_params={'cohc':1.}
-        print('kwargs_ANmodel_params', kwargs_ANmodel_params)
-    print('<START>', dest_filename)
-    main(source_f, dest_filename, idx_start=idx_start, idx_end=idx_end, disp_step=5,
-         source_f_signal_list_key='/pin', source_f_signal_Fs_key='/signal_rate',
-         kwargs_ANmodel_params=kwargs_ANmodel_params, kwargs_output_params={}, kwargs_manipulation_params={})
-    print('<END>', dest_filename)
+        dest_hdf5_filename = dest_filename[:sidx] + '_{:03}_{:06d}-{:06d}' + dest_filename[sidx:]
+        dest_hdf5_filename = dest_hdf5_filename.format(source_file_idx, idx_start, idx_end)
+    
+    # Run the dataset generation function
+    print('>>> [PARALLEL_RUN] job_idx: {}, source_file_idx: {} of {}, jobs_per_source_file: {}'.format(
+        job_idx, source_file_idx, len(source_fn_list), jobs_per_source_file))
+    print('>>> [PARALLEL_RUN] source_hdf5_filename: {}'.format(source_hdf5_filename))
+    print('>>> [PARALLEL_RUN] dest_hdf5_filename: {}'.format(dest_hdf5_filename))
+    run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=idx_start, idx_end=idx_end,
+                           source_key_signal=source_key_signal, source_key_signal_fs=source_key_signal_fs,
+                           source_keys_to_copy=source_keys_to_copy, **kwargs)
