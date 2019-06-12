@@ -84,7 +84,7 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     
     # BEZ2018 ANmodel and sound presentation level parameters
     pin_fs = ANmodel_params.get('pin_fs', 100e3) # sampling rate for ANmodel input (Hz)
-    pin_dBSPL_flag = ANmodel_params.get('pin_dBSPL_flag', 1) # if 1, pin will be re-scaled to specified SPL
+    pin_dBSPL_flag = ANmodel_params.get('pin_dBSPL_flag', 0) # if 1, pin will be re-scaled to specified SPL
     pin_dBSPL = ANmodel_params.get('pin_dBSPL', 65.0) # ANmodel stimulus presentation level (dB SPL)
     species = ANmodel_params.get('species', 2) # 1=cat, 2=human (Shera et al. 2002), 3=human (Glasberg&Moore 1990)
     cohc = ANmodel_params.get('cohc', 1.0) # OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
@@ -176,8 +176,8 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         'pin_fs': pin_fs,
         'meanrates': meanrates.astype(np.float32),
         'meanrates_fs': meanrates_fs,
-        'cf_list': cf_list,
-        'spont_list': spont_list,
+        'cf_list': np.array(cf_list).astype(np.float32),
+        'spont_list': np.array(spont_list).astype(np.float32),
         'meanrates_dur': meanrates_dur,
         'buffer_start_dur': buffer_start_dur,
         'buffer_end_dur': buffer_end_dur,
@@ -190,6 +190,8 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         'implnt': implnt,
         'tabs': tabs,
         'trel': trel,
-        'lpfilter_params': lpfilter_params,
     }
+    for key in lpfilter_params:
+        output_dict['lpfilter_' + key] = lpfilter_params[key]
+    
     return output_dict
