@@ -7,4 +7,6 @@ void IHCAN(double *px,
            double cihc,
            int species,
            double bandwidth_scale_factor,
+           double IhcLowPass_cutoff,
+           double IhcLowPass_order,
            double *ihcout);

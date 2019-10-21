@@ -53,6 +53,8 @@ void IHCAN(double *px,
            double cihc,
            int species,
            double bandwidth_scale_factor,
+           double IhcLowPass_cutoff,
+           double IhcLowPass_order,
            double *ihcout)
 {
 
@@ -243,7 +245,7 @@ void IHCAN(double *px,
 
 		c2vihctmp = -NLogarithm(c2filterouttmp*fabs(c2filterouttmp)*cf/10*cf/2e3,0.2,1.0,cf); /* C2 transduction output */
 
-        ihcouttmp[n] = IhcLowPass(c1vihctmp+c2vihctmp,tdres,3000,n,1.0,7);
+        ihcouttmp[n] = IhcLowPass(c1vihctmp+c2vihctmp,tdres,IhcLowPass_cutoff,n,1.0,IhcLowPass_order);
    };  /* End of the loop */
 
     /* Stretched out the IHC output according to nrep (number of repetitions) */
@@ -759,7 +761,7 @@ double OhcLowPass(double x,double tdres,double Fc, int n,double gain,int order)
 /* -------------------------------------------------------------------------------------------- */
 /* Get the output of the IHC Low Pass Filter  */
 
-double IhcLowPass(double x,double tdres,double Fc, int n,double gain,int order)
+double IhcLowPass(double x, double tdres, double Fc, int n, double gain, int order)
 {
   static double ihc[8],ihcl[8];
 
