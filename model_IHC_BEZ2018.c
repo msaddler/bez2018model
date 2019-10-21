@@ -271,7 +271,7 @@ void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
     of the tuning filter at low level. The TauMin is determined by the gain change between high
     and low level */
 
-double Get_tauwb(double cf, int species, int order, double *taumax,double *taumin)
+double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int order, double *taumax,double *taumin)
 {
   double Q10,bw,gain,ratio;
 
@@ -295,7 +295,7 @@ double Get_tauwb(double cf, int species, int order, double *taumax,double *taumi
   {
     Q10 = cf/24.7/(4.37*(cf/1000)+1)*0.505+0.2085;
   }
-  bw     = cf/Q10;
+  bw = bandwidth_scale_factor*(cf/Q10);
   taumax[0] = 2.0/(TWOPI*bw);
 
   taumin[0]   = taumax[0]*ratio;
