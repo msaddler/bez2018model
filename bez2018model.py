@@ -90,6 +90,8 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     bandwidth_scale_factor = ANmodel_params.get('bandwidth_scale_factor', 1.0) # Cochlear filter BW scaling factor
     cohc = ANmodel_params.get('cohc', 1.0) # OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc = ANmodel_params.get('cihc', 1.0) # IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    IhcLowPass_cutoff = ANmodel_params.get('IhcLowPass_cutoff', 3000.0) # IHC lowpass filter cutoff frequency
+    IhcLowPass_order = ANmodel_params.get('IhcLowPass_order', 7) # IHC lowpass filter order
     noiseType = ANmodel_params.get('noiseType', 1) # set to 0 for noiseless and 1 for variable fGn
     implnt = ANmodel_params.get('implnt', 0) # set to 0 for "approx" and 1 for "actual" power-law implementation
     tabs = ANmodel_params.get('tabs', 0.6e-3) # absolute refractory period (s)
@@ -132,7 +134,9 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
                                       species=species,
                                       bandwidth_scale_factor=bandwidth_scale_factor,
                                       cohc=cohc,
-                                      cihc=cihc)                
+                                      cihc=cihc,
+                                      IhcLowPass_cutoff=IhcLowPass_cutoff,
+                                      IhcLowPass_order=IhcLowPass_order)
         for spont_idx, spont in enumerate(spont_list):
             ###### Run IHC-ANF synapse model ######
             synapse_out = cython_bez2018.run_synapse(vihc, pin_fs, cf,
@@ -193,6 +197,8 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         'bandwidth_scale_factor': bandwidth_scale_factor,
         'cohc': cohc,
         'cihc': cihc,
+        'IhcLowPass_cutoff': IhcLowPass_cutoff,
+        'IhcLowPass_order': IhcLowPass_order,
         'noiseType': noiseType,
         'implnt': implnt,
         'tabs': tabs,

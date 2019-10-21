@@ -35,6 +35,8 @@ cdef extern from "model_IHC_BEZ2018.h":
         double cihc,
         int species,
         double bandwidth_scale_factor,
+        double IhcLowPass_cutoff,
+        double IhcLowPass_order,
         double *ihcout
     )
 
@@ -65,7 +67,9 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
             int species=1,
             double bandwidth_scale_factor=1.,
             double cohc=1.,
-            double cihc=1.):
+            double cihc=1.,
+            IhcLowPass_cutoff=3000.,
+            IhcLowPass_order=7):
     """
     Run middle ear filter, BM filters, and IHC model.
     (based on https://github.com/mrkrd/cochlea/blob/master/cochlea/zilany2014)
@@ -79,6 +83,8 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     bandwidth_scale_factor (float): scales cochlear filter bandwidth
     cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    IhcLowPass_cutoff (float): cutoff frequency for IHC lowpass filter (Hz)
+    IhcLowPass_order (int): order for IHC lowpass filter
 
     Returns
     -------
@@ -118,6 +124,8 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
         cihc,                   #double cihc,
         species,                #int species,
         bandwidth_scale_factor, #double bandwidth_scale_factor
+        IhcLowPass_cutoff,      #double IhcLowPass_cutoff
+        IhcLowPass_order,       #int IhcLowPass_order
         ihcout_data             #double *ihcout
     )
     return ihcout
