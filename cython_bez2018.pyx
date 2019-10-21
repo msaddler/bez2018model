@@ -34,6 +34,7 @@ cdef extern from "model_IHC_BEZ2018.h":
         double cohc,
         double cihc,
         int species,
+        double bandwidth_scale_factor,
         double *ihcout
     )
 
@@ -62,6 +63,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
             double fs,
             double cf,
             int species=1,
+            double bandwidth_scale_factor=1.,
             double cohc=1.,
             double cihc=1.):
     """
@@ -74,6 +76,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     fs (float): sampling rate in Hz
     cf (float): characteristic frequency in Hz
     species (int): sets filter parameters: 1=cat, 2=human, 3=G&M1990
+    bandwidth_scale_factor (float): scales cochlear filter bandwidth
     cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
 
@@ -105,15 +108,16 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
 
     # Run model_IHC_BEZ2018.IHCAN (modifies ihcout_data in place)
     IHCAN(
-        signal_data,        #double *px,
-        cf,                 #double cf,
-        1,                  #int nrep,
-        1.0/fs,             #double tdres,
-        len(signal),        #int totalstim,
-        cohc,               #double cohc,
-        cihc,               #double cihc,
-        species,            #int species,
-        ihcout_data         #double *ihcout
+        signal_data,            #double *px,
+        cf,                     #double cf,
+        1,                      #int nrep,
+        1.0/fs,                 #double tdres,
+        len(signal),            #int totalstim,
+        cohc,                   #double cohc,
+        cihc,                   #double cihc,
+        species,                #int species,
+        bandwidth_scale_factor, #double bandwidth_scale_factor
+        ihcout_data             #double *ihcout
     )
     return ihcout
 
