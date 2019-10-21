@@ -34,6 +34,9 @@ cdef extern from "model_IHC_BEZ2018.h":
         double cohc,
         double cihc,
         int species,
+        double bandwidth_scale_factor,
+        double IhcLowPass_cutoff,
+        double IhcLowPass_order,
         double *ihcout
     )
 
@@ -62,8 +65,11 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
             double fs,
             double cf,
             int species=1,
+            double bandwidth_scale_factor=1.,
             double cohc=1.,
-            double cihc=1.):
+            double cihc=1.,
+            IhcLowPass_cutoff=3000.,
+            IhcLowPass_order=7):
     """
     Run middle ear filter, BM filters, and IHC model.
     (based on https://github.com/mrkrd/cochlea/blob/master/cochlea/zilany2014)
@@ -74,8 +80,11 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     fs (float): sampling rate in Hz
     cf (float): characteristic frequency in Hz
     species (int): sets filter parameters: 1=cat, 2=human, 3=G&M1990
+    bandwidth_scale_factor (float): scales cochlear filter bandwidth
     cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    IhcLowPass_cutoff (float): cutoff frequency for IHC lowpass filter (Hz)
+    IhcLowPass_order (int): order for IHC lowpass filter
 
     Returns
     -------
@@ -90,6 +99,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
         assert (cf > 124.9) and (cf < 40e3), "CF out of range for cat (125Hz to 40kHz)"
     else:
         assert (cf > 124.9) and (cf < 20001.), "CF out of range for human (125Hz to 20kHz)"
+    assert (bandwidth_scale_factor > 0), "bandwidth_scale_factor must be positive"
     assert (fs >= 100e3) and (fs <= 500e3), "Sampling rate out of range (100kHz to 500kHz)"
     assert (cohc >= 0) and (cohc <= 1), "cohc out of range ([0, 1])"
     assert (cihc >= 0) and (cihc <= 1), "cihc out of range ([0, 1])"
@@ -105,15 +115,18 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
 
     # Run model_IHC_BEZ2018.IHCAN (modifies ihcout_data in place)
     IHCAN(
-        signal_data,        #double *px,
-        cf,                 #double cf,
-        1,                  #int nrep,
-        1.0/fs,             #double tdres,
-        len(signal),        #int totalstim,
-        cohc,               #double cohc,
-        cihc,               #double cihc,
-        species,            #int species,
-        ihcout_data         #double *ihcout
+        signal_data,            #double *px,
+        cf,                     #double cf,
+        1,                      #int nrep,
+        1.0/fs,                 #double tdres,
+        len(signal),            #int totalstim,
+        cohc,                   #double cohc,
+        cihc,                   #double cihc,
+        species,                #int species,
+        bandwidth_scale_factor, #double bandwidth_scale_factor
+        IhcLowPass_cutoff,      #double IhcLowPass_cutoff
+        IhcLowPass_order,       #int IhcLowPass_order
+        ihcout_data             #double *ihcout
     )
     return ihcout
 

@@ -44,8 +44,18 @@
 
 
 
-void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
-           double cohc, double cihc, int species, double *ihcout)
+void IHCAN(double *px,
+           double cf,
+           int nrep,
+           double tdres,
+           int totalstim,
+           double cohc,
+           double cihc,
+           int species,
+           double bandwidth_scale_factor,
+           double IhcLowPass_cutoff,
+           double IhcLowPass_order,
+           double *ihcout)
 {
 
     /*variables for middle-ear model */
@@ -67,7 +77,7 @@ void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
 	double C2ChirpFilt(double, double,double, int, double, double);
     double WbGammaTone(double, double, double, int, double, double, int);
 
-    double Get_tauwb(double, int, int, double *, double *);
+    double Get_tauwb(double, int, double, int, double *, double *);
 	double Get_taubm(double, int, double, double *, double *, double *);
     double gain_groupdelay(double, double, double, double, int *);
     double delay_cat(double cf);
@@ -118,7 +128,7 @@ void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
 
 	/*====== Parameters for the control-path wideband filter =======*/
 	bmorder = 3;
-	Get_tauwb(cf,species,bmorder,Taumax,Taumin);
+	Get_tauwb(cf,species,bandwidth_scale_factor,bmorder,Taumax,Taumin);
 	taubm   = cohc*(Taumax[0]-Taumin[0])+Taumin[0];
 	ratiowb = Taumin[0]/Taumax[0];
 	/*====== Parameters for the signal-path C1 filter ======*/
@@ -235,7 +245,7 @@ void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
 
 		c2vihctmp = -NLogarithm(c2filterouttmp*fabs(c2filterouttmp)*cf/10*cf/2e3,0.2,1.0,cf); /* C2 transduction output */
 
-        ihcouttmp[n] = IhcLowPass(c1vihctmp+c2vihctmp,tdres,3000,n,1.0,7);
+        ihcouttmp[n] = IhcLowPass(c1vihctmp+c2vihctmp,tdres,IhcLowPass_cutoff,n,1.0,IhcLowPass_order);
    };  /* End of the loop */
 
     /* Stretched out the IHC output according to nrep (number of repetitions) */
@@ -271,7 +281,7 @@ void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
     of the tuning filter at low level. The TauMin is determined by the gain change between high
     and low level */
 
-double Get_tauwb(double cf, int species, int order, double *taumax,double *taumin)
+double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int order, double *taumax,double *taumin)
 {
   double Q10,bw,gain,ratio;
 
@@ -295,7 +305,7 @@ double Get_tauwb(double cf, int species, int order, double *taumax,double *taumi
   {
     Q10 = cf/24.7/(4.37*(cf/1000)+1)*0.505+0.2085;
   }
-  bw     = cf/Q10;
+  bw = bandwidth_scale_factor*(cf/Q10);
   taumax[0] = 2.0/(TWOPI*bw);
 
   taumin[0]   = taumax[0]*ratio;
@@ -751,7 +761,7 @@ double OhcLowPass(double x,double tdres,double Fc, int n,double gain,int order)
 /* -------------------------------------------------------------------------------------------- */
 /* Get the output of the IHC Low Pass Filter  */
 
-double IhcLowPass(double x,double tdres,double Fc, int n,double gain,int order)
+double IhcLowPass(double x, double tdres, double Fc, int n, double gain, int order)
 {
   static double ihc[8],ihcl[8];
 

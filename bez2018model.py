@@ -87,8 +87,11 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     pin_dBSPL_flag = ANmodel_params.get('pin_dBSPL_flag', 0) # if 1, pin will be re-scaled to specified SPL
     pin_dBSPL = ANmodel_params.get('pin_dBSPL', 65.0) # ANmodel stimulus presentation level (dB SPL)
     species = ANmodel_params.get('species', 2) # 1=cat, 2=human (Shera et al. 2002), 3=human (Glasberg&Moore 1990)
+    bandwidth_scale_factor = ANmodel_params.get('bandwidth_scale_factor', 1.0) # Cochlear filter BW scaling factor
     cohc = ANmodel_params.get('cohc', 1.0) # OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc = ANmodel_params.get('cihc', 1.0) # IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    IhcLowPass_cutoff = ANmodel_params.get('IhcLowPass_cutoff', 3000.0) # IHC lowpass filter cutoff frequency
+    IhcLowPass_order = ANmodel_params.get('IhcLowPass_order', 7) # IHC lowpass filter order
     noiseType = ANmodel_params.get('noiseType', 1) # set to 0 for noiseless and 1 for variable fGn
     implnt = ANmodel_params.get('implnt', 0) # set to 0 for "approx" and 1 for "actual" power-law implementation
     tabs = ANmodel_params.get('tabs', 0.6e-3) # absolute refractory period (s)
@@ -113,6 +116,7 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     # If pin_dBSPL_flag, scale pin to desired dB SPL (otherwise compute dB SPL)
     if pin_dBSPL_flag:
         desired_rms = 2e-5 * np.power(10, pin_dBSPL / 20)
+        pin = pin - np.mean(mean)
         pin = desired_rms * (pin / np.sqrt(np.mean(np.square(pin))))
     else:
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
@@ -128,13 +132,19 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         ###### Run IHC model ######
         vihc = cython_bez2018.run_ihc(pin, pin_fs, cf,
                                       species=species,
+                                      bandwidth_scale_factor=bandwidth_scale_factor,
                                       cohc=cohc,
-                                      cihc=cihc)                
+                                      cihc=cihc,
+                                      IhcLowPass_cutoff=IhcLowPass_cutoff,
+                                      IhcLowPass_order=IhcLowPass_order)
         for spont_idx, spont in enumerate(spont_list):
             ###### Run IHC-ANF synapse model ######
             synapse_out = cython_bez2018.run_synapse(vihc, pin_fs, cf,
-                                                     noiseType=noiseType, implnt=implnt,
-                                                     spont=spont, tabs=tabs, trel=trel)
+                                                     noiseType=noiseType,
+                                                     implnt=implnt,
+                                                     spont=spont,
+                                                     tabs=tabs,
+                                                     trel=trel)
             # Downsample meanrates to meanrates_fs
             meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(meanrates_fs), int(pin_fs))
             meanrate[meanrate < 0] = 0 # Half-wave rectify to remove negative artifacts from downsampling
@@ -184,8 +194,11 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         'pin_dBSPL_flag': pin_dBSPL_flag,
         'pin_dBSPL': pin_dBSPL,
         'species': species,
+        'bandwidth_scale_factor': bandwidth_scale_factor,
         'cohc': cohc,
         'cihc': cihc,
+        'IhcLowPass_cutoff': IhcLowPass_cutoff,
+        'IhcLowPass_order': IhcLowPass_order,
         'noiseType': noiseType,
         'implnt': implnt,
         'tabs': tabs,
