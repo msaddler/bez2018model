@@ -93,6 +93,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
         assert (cf > 124.9) and (cf < 40e3), "CF out of range for cat (125Hz to 40kHz)"
     else:
         assert (cf > 124.9) and (cf < 20001.), "CF out of range for human (125Hz to 20kHz)"
+    assert (bandwidth_scale_factor > 0), "bandwidth_scale_factor must be positive"
     assert (fs >= 100e3) and (fs <= 500e3), "Sampling rate out of range (100kHz to 500kHz)"
     assert (cohc >= 0) and (cohc <= 1), "cohc out of range ([0, 1])"
     assert (cihc >= 0) and (cihc <= 1), "cihc out of range ([0, 1])"
