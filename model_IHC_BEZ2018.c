@@ -44,16 +44,8 @@
 
 
 
-void IHCAN(double *px,
-           double cf,
-           int nrep,
-           double tdres,
-           int totalstim,
-           double cohc,
-           double cihc,
-           int species,
-           double bandwidth_scale_factor,
-           double *ihcout)
+void IHCAN(double *px, double cf, int nrep, double tdres, int totalstim,
+           double cohc, double cihc, int species, double *ihcout)
 {
 
     /*variables for middle-ear model */
@@ -75,7 +67,7 @@ void IHCAN(double *px,
 	double C2ChirpFilt(double, double,double, int, double, double);
     double WbGammaTone(double, double, double, int, double, double, int);
 
-    double Get_tauwb(double, int, double, int, double *, double *);
+    double Get_tauwb(double, int, int, double *, double *);
 	double Get_taubm(double, int, double, double *, double *, double *);
     double gain_groupdelay(double, double, double, double, int *);
     double delay_cat(double cf);
@@ -126,7 +118,7 @@ void IHCAN(double *px,
 
 	/*====== Parameters for the control-path wideband filter =======*/
 	bmorder = 3;
-	Get_tauwb(cf,species,bandwidth_scale_factor,bmorder,Taumax,Taumin);
+	Get_tauwb(cf,species,bmorder,Taumax,Taumin);
 	taubm   = cohc*(Taumax[0]-Taumin[0])+Taumin[0];
 	ratiowb = Taumin[0]/Taumax[0];
 	/*====== Parameters for the signal-path C1 filter ======*/
@@ -279,7 +271,7 @@ void IHCAN(double *px,
     of the tuning filter at low level. The TauMin is determined by the gain change between high
     and low level */
 
-double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int order, double *taumax,double *taumin)
+double Get_tauwb(double cf, int species, int order, double *taumax,double *taumin)
 {
   double Q10,bw,gain,ratio;
 
@@ -303,7 +295,7 @@ double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int orde
   {
     Q10 = cf/24.7/(4.37*(cf/1000)+1)*0.505+0.2085;
   }
-  bw = bandwidth_scale_factor * (cf/Q10);
+  bw     = cf/Q10;
   taumax[0] = 2.0/(TWOPI*bw);
 
   taumin[0]   = taumax[0]*ratio;
@@ -311,7 +303,7 @@ double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int orde
   return 0;
 }
 /* -------------------------------------------------------------------------------------------- */
-double Get_taubm(double cf, int species, double taumax, double *bmTaumax, double *bmTaumin, double *ratio)
+double Get_taubm(double cf, int species, double taumax,double *bmTaumax,double *bmTaumin, double *ratio)
 {
   double gain,factor,bwfactor;
 
