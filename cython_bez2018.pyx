@@ -200,11 +200,12 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         trd_vector_data     #double *trel_vector
     )
     output_dict = {
-        'synout':synout,
-        'meanrate':meanrate,
-        'varrate':varrate,
-        'trd_vector':trd_vector,
-        'trel_vector':trel_vector
+        'synout': synout,
+        'meanrate': meanrate,
+        'varrate': varrate,
+        'psth': psth,
+        'trd_vector': trd_vector,
+        'trel_vector': trel_vector
     }
     return output_dict
 
