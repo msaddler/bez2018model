@@ -2,7 +2,7 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 from libc.stdlib cimport malloc
-import util
+import util_bez2018
 import scipy.signal
 
 cimport numpy as np
@@ -259,9 +259,9 @@ cdef public double* decimate(int k, double *signal, int q):
 
 cdef public double* ffGn(int N, double tdres, double Hinput, double noiseType, double mu):
     """
-    Wrapper for util.ffGn
+    Wrapper for util_bez2018.ffGn
     """
-    a = util.ffGn(N, tdres, Hinput, noiseType, mu)
+    a = util_bez2018.ffGn(N, tdres, Hinput, noiseType, mu)
     # Ensure array is C contiguous
     if not a.flags['C_CONTIGUOUS']:
         a = a.copy(order='C')
