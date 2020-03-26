@@ -106,7 +106,7 @@ def nervegram_meanrates(signal,
     # Initialize output (downsample pin to get the correct time dimension length)
     decimated_pin = scipy.signal.resample_poly(pin, int(meanrates_fs), int(pin_fs))
     meanrates = np.zeros((len(cf_list), decimated_pin.shape[0], len(spont_list)))
-
+    
     # Iterate over all CFs and spont rates (only synapse model uses spont rate)
     for cf_idx, cf in enumerate(cf_list):
         ###### Run IHC model ######
