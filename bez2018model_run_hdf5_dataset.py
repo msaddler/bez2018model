@@ -3,9 +3,23 @@ import os
 import bez2018model
 import numpy as np
 import h5py
-import warnings
+import copy
 import glob
 import dask.array
+
+
+def recursive_dict_merge(dict1, dict2):
+    '''
+    Returns a new dictionary by merging two dictionaries recursively.
+    This function is useful for minimally updating dict1 with dict2.
+    '''
+    result = copy.deepcopy(dict1)
+    for key, value in dict2.items():
+        if isinstance(value, collections.Mapping):
+            result[key] = recursive_dict_merge(result.get(key, {}), value)
+        else:
+            result[key] = copy.deepcopy(dict2[key])
+    return result
 
 
 def write_example_to_hdf5(hdf5_f,
@@ -105,7 +119,7 @@ def check_continuation(hdf5_filename,
             else:
                 start_idx = None
         else:
-            warnings.warn('<<< check_key not found in hdf5 file; hdf5 dataset will be restarted >>>')
+            print('>>> [WARNING] check_key not found in hdf5 file; hdf5 dataset will be restarted')
         f.close()
     return continuation_flag, start_idx
 
@@ -233,11 +247,19 @@ def generate_nervegram_meanrates(hdf5_filename,
                 rms_noise = np.sqrt(np.mean(np.square(noise)))
                 rms_noise_scaling = rms_signal / (rms_noise * np.power(10, snr / 20))
                 signal = signal + rms_noise_scaling * noise
+        # Update stimulus sound presentation level settings in kwargs_nervegram_meanrates
+        kwargs_nm = kwargs_nervegram_meanrates[idx]
+        if list_dbspl is not None:
+            kwargs_nm_update = {
+                'ANmodel_params': {
+                    'pin_dBSPL_flag': 1,
+                    'pin_dBSPL': list_dbspl[idx]
+                }
+            }
+            kwargs_nm = recursive_dict_merge(kwargs_nm, kwargs_nm_update)
 
         # Run stimulus through ANmodel and generate meanrates nervegram
-        data_dict = bez2018model.nervegram_meanrates(signal,
-                                                     signal_fs,
-                                                     **kwargs_nervegram_meanrates[idx])
+        data_dict = bez2018model.nervegram_meanrates(signal, signal_fs, **kwargs_nm)
 
         # If key pair lists are empty, get reasonable defaults
         if len(data_key_pair_list) == 0:
@@ -316,13 +338,13 @@ def run_dataset_generation(source_hdf5_filename,
     # Collect input signals and sampling rate from the source hdf5 file
     if (idx_end == None) or (idx_end > source_hdf5_f[source_key_signal].shape[0]):
         idx_end = source_hdf5_f[source_key_signal].shape[0]
-    assert idx_start < idx_end, 'idx_start must be less than idx_end'
+    assert idx_start < idx_end, "idx_start must be less than idx_end"
     list_signal = source_hdf5_f[source_key_signal][idx_start:idx_end]
     signal_fs = source_hdf5_f[source_key_signal_fs][0]
     # Collect input noise and SNR from the source hdf5 file
     if source_key_snr is not None:
         list_snr = source_hdf5_f[source_key_snr][idx_start:idx_end]
-        msg = 'source_key_noise must be specified if source_key_snr is specified'
+        msg = "source_key_noise must be specified if source_key_snr is specified"
         assert source_key_noise is not None, msg
         list_noise = source_hdf5_f[source_key_noise][idx_start:idx_end]
     else:
@@ -330,10 +352,10 @@ def run_dataset_generation(source_hdf5_filename,
         list_noise = None
     # Collect stimulus sound presentation levels from the source hdf5 file
     if source_key_dbspl is not None:
-        assert range_dbspl is None, 'cannot specifiy both source_key_dbspl and range_dbspl'
+        assert range_dbspl is None, "cannot specifiy both source_key_dbspl and range_dbspl"
         list_dbspl = source_hdf5_f[source_key_dbspl][idx_start:idx_end]
     elif range_dbspl is not None:
-        assert len(range_dbspl) == 2, 'range_dbspl must be (min, max) pair'
+        assert len(range_dbspl) == 2, "range_dbspl must be (min, max) pair"
         list_dbspl = np.random.uniform(low=range_dbspl[0], high=range_dbspl[1], size=list_signal.shape[0])
     else:
         list_dbspl = None
