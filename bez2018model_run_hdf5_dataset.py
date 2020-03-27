@@ -193,11 +193,11 @@ def generate_nervegram_meanrates(hdf5_filename,
     Args
     ----
     hdf5_filename (str): filename for hdf5 dataset in which to store ANmodel outputs
-    list_signal (np.ndarray): signal waveforms to pass through ANmodel (signal index by time array)
+    list_signal (np.ndarray): dataset of signal waveforms (signal index by time array)
     signal_fs (int): sampling rate of signals in list_signal (Hz)
-    list_snr (np.ndarray): stimulus signal to noise ratios (if None, signal is used as stimulus)
-    list_noise (np.ndarray): noise waveforms to combine signals with (required if list_snr is not None)
-    list_dbspl (np.ndarray): stimulus sound presentation levels (if None, signal level is used)
+    list_snr (np.ndarray): dataset of stimulus SNR values (if None, signal is used as stimulus)
+    list_noise (np.ndarray): dataset of noise waveforms (required if list_snr is not None)
+    list_dbspl (np.ndarray): dataset of stimulus dB SPL values (if None, signal level is used)
     disp_step (int): every disp_step, progress is displayed and hdf5 file is checkpointed
     data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
     config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
@@ -292,7 +292,7 @@ def generate_nervegram_meanrates(hdf5_filename,
         if idx % disp_step == 0:
             hdf5_f.close()
             hdf5_f = h5py.File(hdf5_filename, 'r+')
-            print('... signal {} of {}'.format(idx, N))
+            print('... signal {:06d} of {:06d} ({:.2f} dB SPL)'.format(idx, N, data_dict['pin_dBSPL']))
 
     # Close the hdf5 dataset for the last time
     hdf5_f.close()
@@ -309,7 +309,6 @@ def run_dataset_generation(source_hdf5_filename,
                            source_key_noise=None,
                            source_key_dbspl=None,
                            source_keys_to_copy=[],
-                           range_snr=None,
                            range_dbspl=None,
                            **kwargs):
     '''
@@ -324,9 +323,9 @@ def run_dataset_generation(source_hdf5_filename,
     idx_end (int or None): upper limit of stimulus range in source_hdf5_filename to process
     source_key_signal (str): key for signal dataset in source_hdf5_filename
     source_key_signal_fs (str): key for stimulus sampling rate in source_hdf5_filename
-    source_key_snr (str): key for stimulus signal to noise ratio (source_key_noise is ignored if None)
+    source_key_snr (str): key for stimulus SNR dataset (source_key_noise is ignored if None)
     source_key_noise (str): key for noise dataset in source_hdf5_filename (required if source_key_snr is specified)
-    source_key_dbspl (str): key for stimulus sound presentation level in source_hdf5_filename
+    source_key_dbspl (str): key for stimulus dB SPL dataset in source_hdf5_filename
     source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
     range_dbspl (list): min / max sound presentation level (only used if source_key_dbspl is None)
     **kwargs (passed directly to `generate_nervegram_meanrates()`)
@@ -393,8 +392,6 @@ def parallel_run_dataset_generation(source_regex,
                                     job_idx=0,
                                     jobs_per_source_file=10,
                                     source_key_signal='/signal',
-                                    source_key_signal_fs='/signal_rate',
-                                    source_keys_to_copy=[],
                                     **kwargs):
     '''
     Wrapper function to easily parallelize `run_dataset_generation()`.
@@ -406,8 +403,6 @@ def parallel_run_dataset_generation(source_regex,
     job_idx (int): index of current job
     jobs_per_source_file (int): number of jobs each source file is split into
     source_key_signal (str): key for signal dataset in source_hdf5_filename
-    source_key_signal_fs (str): key for stimulus sampling rate in source_hdf5_filename
-    source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
     **kwargs (passed directly to `generate_nervegram_meanrates()`)
     '''
     # Determine the source_hdf5_filename using source_regex, job_idx, and jobs_per_source_file
@@ -444,6 +439,4 @@ def parallel_run_dataset_generation(source_regex,
                            idx_start=idx_start,
                            idx_end=idx_end,
                            source_key_signal=source_key_signal,
-                           source_key_signal_fs=source_key_signal_fs,
-                           source_keys_to_copy=source_keys_to_copy,
                            **kwargs)
