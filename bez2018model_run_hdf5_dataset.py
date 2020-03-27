@@ -55,13 +55,15 @@ def initialize_hdf5_file(hdf5_filename,
     # Create the main output datasets
     for (hdf5_key, data_key) in data_key_pair_list:
         data_key_value = np.squeeze(np.array(data_dict[data_key]))
-        if cast_data: data_key_value = data_key_value.astype(dtype)
+        if cast_data:
+            data_key_value = data_key_value.astype(dtype)
         data_key_shape = [N] + list(data_key_value.shape)
         f.create_dataset(hdf5_key, data_key_shape, dtype=data_key_value.dtype)
     # Create and populate the config datasets
     for (hdf5_key, config_key) in config_key_pair_list:
         config_key_value = np.squeeze(np.array(data_dict[config_key]))
-        if cast_config: config_key_value = config_key_value.astype(dtype)
+        if cast_config:
+            config_key_value = config_key_value.astype(dtype)
         config_key_shape = [1] + list(config_key_value.shape)
         f.create_dataset(hdf5_key,
                          config_key_shape,
@@ -98,8 +100,10 @@ def check_continuation(hdf5_filename,
         if check_key in f:
             candidate_idxs = np.reshape(np.argwhere(f[check_key][:] == check_key_fill_value), [-1])
             continuation_flag = True
-            if len(candidate_idxs > 0): start_idx = np.max([0, np.min(candidate_idxs)-repeat_buffer])
-            else: start_idx = None
+            if len(candidate_idxs > 0):
+                start_idx = np.max([0, np.min(candidate_idxs)-repeat_buffer])
+            else:
+                start_idx = None
         else:
             warnings.warn('<<< check_key not found in hdf5 file; hdf5 dataset will be restarted >>>')
         f.close()
@@ -286,8 +290,10 @@ def run_dataset_generation(source_hdf5_filename,
     dsets_to_copy = {}
     for key in source_keys_to_copy:
         if key in source_hdf5_f:
-            if source_hdf5_f[key].shape[0] == 1: key_dset = source_hdf5_f[key]
-            else: key_dset = source_hdf5_f[key][idx_start : idx_end]
+            if source_hdf5_f[key].shape[0] == 1:
+                key_dset = source_hdf5_f[key]
+            else:
+                key_dset = source_hdf5_f[key][idx_start : idx_end]
             dsets_to_copy[key] = dask.array.from_array(key_dset, chunks=key_dset.shape)
             print('>>> [COPYING FROM SOURCE]: {}'.format(key), dsets_to_copy[key].shape)
     if dsets_to_copy: dask.array.to_hdf5(dest_hdf5_filename, dsets_to_copy)
