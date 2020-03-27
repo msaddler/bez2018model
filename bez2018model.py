@@ -24,31 +24,11 @@ def get_ERB_cf_list(num_cfs, min_cf=125., max_cf=10e3):
     return list(cf_list)
 
 
-def apply_lowpass_filter(x, fs, axis=1, order=6, cutoff=0):
-    '''
-    Helper function to apply lowpass butterworth filter to an array with filtfilt.
-    
-    Args
-    ----
-    x (np array): array to be filtered
-    fs (int): sampling rate of x in Hz
-    axis (int): axis along which to apply filter
-    order (int): filter order (passed to scipy.signal.butter); NOTE filter is applied twice
-    cutoff (float): butterworth filter -3 dB cutoff frequency; NOTE filter is applied twice
-    
-    Returns
-    -------
-    x (np array): lowpass filtered x
-    '''
-    if cutoff > 0:
-        b, a = scipy.signal.butter(order, cutoff/(fs/2), btype='lowpass')
-        x = scipy.signal.filtfilt(b, a, x, axis=axis)
-    else: print('No lowpass filter applied (cutoff={}Hz)'.format(cutoff))
-    return x
-
-
-def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={},
-                        lpfilter_params={}, random_seed=None):
+def nervegram_meanrates(signal,
+                        signal_fs,
+                        meanrates_params={},
+                        ANmodel_params={},
+                        random_seed=None):
     '''
     Main function for generating an auditory nervegram using the meanrates output
     from the BEZ2018 ANmodel (analytic estimate of instantaneous firing rate).
@@ -56,10 +36,9 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     Args
     ----
     signal (np array): input pressure waveform must be 1-dimensional array (units Pa)
-    signal_fs (int): sampling rate of signal
+    signal_fs (int): sampling rate of signal (Hz)
     meanrates_params (dict): parameters for formatting output nervegram
     ANmodel_params (dict): parameters for running BEZ2018 ANmodel
-    lpfilter_params (dict): parameters for applying a lowpass filter to nervegram
     random_seed (int or None): if not None, used to set np.random.seed
     
     Returns
@@ -69,7 +48,8 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     # ======================== PARSE PARAMETERS ======================== #
     
     # If specified, set random seed (eliminates stochasticity in ANmodel noise)
-    if not (random_seed == None): np.random.seed(random_seed)
+    if not (random_seed == None):
+        np.random.seed(random_seed)
     
     # BEZ2018 ANmodel requires 1 dimensional arrays with dtype np.float64
     signal = np.squeeze(signal).astype(np.float64)
@@ -126,7 +106,7 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
     # Initialize output (downsample pin to get the correct time dimension length)
     decimated_pin = scipy.signal.resample_poly(pin, int(meanrates_fs), int(pin_fs))
     meanrates = np.zeros((len(cf_list), decimated_pin.shape[0], len(spont_list)))
-
+    
     # Iterate over all CFs and spont rates (only synapse model uses spont rate)
     for cf_idx, cf in enumerate(cf_list):
         ###### Run IHC model ######
@@ -151,10 +131,6 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
             meanrates[cf_idx, :, spont_idx] = meanrate
     
     # ======================== APPLY MANIPULATIONS ======================== #
-    
-    # Apply lowpass filter to nervegram (if lpfilter_params is specified)
-    if lpfilter_params:
-        meanrates = apply_lowpass_filter(meanrates, meanrates_fs, axis=1, **lpfilter_params)
     
     # Randomly clip a segment of duration meanrates_dur from the larger nervegram
     (clip_start_meanrates, clip_end_meanrates) = (0, meanrates.shape[1])
@@ -204,7 +180,5 @@ def nervegram_meanrates(signal, signal_fs, meanrates_params={}, ANmodel_params={
         'tabs': tabs,
         'trel': trel,
     }
-    for key in lpfilter_params:
-        output_dict['lpfilter_' + key] = lpfilter_params[key]
     
     return output_dict

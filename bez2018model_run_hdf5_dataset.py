@@ -8,7 +8,10 @@ import glob
 import dask.array
 
 
-def write_example_to_hdf5(hdf5_f, data_dict, idx, data_key_pair_list=[]):
+def write_example_to_hdf5(hdf5_f,
+                          data_dict,
+                          idx,
+                          data_key_pair_list=[]):
     '''
     Write individual example to open hdf5 file.
     
@@ -23,9 +26,15 @@ def write_example_to_hdf5(hdf5_f, data_dict, idx, data_key_pair_list=[]):
         hdf5_f[hdf5_key][idx] = np.squeeze(np.array(data_dict[data_key]))
 
 
-def initialize_hdf5_file(hdf5_filename, N, data_dict, file_mode='w',
-                         data_key_pair_list=[], config_key_pair_list=[],
-                         dtype=np.float32, cast_data=True, cast_config=False):
+def initialize_hdf5_file(hdf5_filename,
+                         N,
+                         data_dict,
+                         file_mode='w',
+                         data_key_pair_list=[],
+                         config_key_pair_list=[],
+                         dtype=np.float32,
+                         cast_data=True,
+                         cast_config=False):
     '''
     Create a new hdf5 file and populate config parameters.
     
@@ -54,13 +63,17 @@ def initialize_hdf5_file(hdf5_filename, N, data_dict, file_mode='w',
         config_key_value = np.squeeze(np.array(data_dict[config_key]))
         if cast_config: config_key_value = config_key_value.astype(dtype)
         config_key_shape = [1] + list(config_key_value.shape)
-        f.create_dataset(hdf5_key, config_key_shape, dtype=config_key_value.dtype,
+        f.create_dataset(hdf5_key,
+                         config_key_shape,
+                         dtype=config_key_value.dtype,
                          data=config_key_value)
     # Close the initialized hdf5 file
     f.close()
 
 
-def check_continuation(hdf5_filename, check_key='/pin_dBSPL', check_key_fill_value=0,
+def check_continuation(hdf5_filename,
+                       check_key='/pin_dBSPL',
+                       check_key_fill_value=0,
                        repeat_buffer=1):
     '''
     This function checks if the output dataset already exists and should be continued
@@ -93,7 +106,8 @@ def check_continuation(hdf5_filename, check_key='/pin_dBSPL', check_key_fill_val
     return continuation_flag, start_idx
 
 
-def get_default_data_key_pair_list(data_dict, hdf5_key_prefix='',
+def get_default_data_key_pair_list(data_dict,
+                                   hdf5_key_prefix='',
                                    data_keys=['meanrates', 'signal', 'pin_dBSPL']):
     '''
     Helper function to get default data_key_pair_list from data_dict.
@@ -115,7 +129,8 @@ def get_default_data_key_pair_list(data_dict, hdf5_key_prefix='',
     return data_key_pair_list
 
 
-def get_default_config_key_pair_list(data_dict, hdf5_key_prefix='config_bez2018model/',
+def get_default_config_key_pair_list(data_dict,
+                                     hdf5_key_prefix='config_bez2018model/',
                                      ignore_keys=['meanrates', 'signal', 'pin', 'pin_dBSPL'],
                                      flat_keyparts=['_fs', '_list']):
     '''
@@ -142,8 +157,12 @@ def get_default_config_key_pair_list(data_dict, hdf5_key_prefix='config_bez2018m
     return config_key_pair_list
 
 
-def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_step=10,
-                                 data_key_pair_list=[], config_key_pair_list=[],
+def generate_nervegram_meanrates(hdf5_filename,
+                                 signal_list,
+                                 signal_fs,
+                                 disp_step=10,
+                                 data_key_pair_list=[],
+                                 config_key_pair_list=[],
                                  kwargs_nervegram_meanrates={},
                                  kwargs_check_continuation={},
                                  kwargs_initialization={}):
@@ -183,7 +202,8 @@ def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_ste
     for idx in range(start_idx, N):
         
         # Run stimulus through ANmodel and generate meanrates nervegram
-        data_dict = bez2018model.nervegram_meanrates(signal_list[idx], signal_fs,
+        data_dict = bez2018model.nervegram_meanrates(signal_list[idx],
+                                                     signal_fs,
                                                      **kwargs_nervegram_meanrates[idx])
         
         # If key pair lists are empty, get reasonable defaults
@@ -198,7 +218,9 @@ def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_ste
         if not continuation_flag:
             print('>>> [INITIALIZING] {}'.format(hdf5_filename))
             assert idx == 0, "hdf5 dataset should only be initialized when idx=0"
-            initialize_hdf5_file(hdf5_filename, N, data_dict,
+            initialize_hdf5_file(hdf5_filename,
+                                 N,
+                                 data_dict,
                                  data_key_pair_list=data_key_pair_list,
                                  config_key_pair_list=config_key_pair_list,
                                  **kwargs_initialization)
@@ -206,7 +228,9 @@ def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_ste
             hdf5_f = h5py.File(hdf5_filename, 'r+')
         
         # Write the ANmodel outputs to the hdf5 dataset
-        write_example_to_hdf5(hdf5_f, data_dict, idx,
+        write_example_to_hdf5(hdf5_f,
+                              data_dict,
+                              idx,
                               data_key_pair_list=data_key_pair_list)
         
         # Display progress and close/re-open hdf5 dataset
@@ -220,9 +244,14 @@ def generate_nervegram_meanrates(hdf5_filename, signal_list, signal_fs, disp_ste
     print('>>> [COMPLETING] {}'.format(hdf5_filename))
 
 
-def run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=0, idx_end=None,
-                           source_key_signal='/signal', source_key_signal_fs='/signal_rate',
-                           source_keys_to_copy=[], **kwargs):
+def run_dataset_generation(source_hdf5_filename,
+                           dest_hdf5_filename,
+                           idx_start=0,
+                           idx_end=None,
+                           source_key_signal='/signal',
+                           source_key_signal_fs='/signal_rate',
+                           source_keys_to_copy=[],
+                           **kwargs):
     '''
     Read stimuli from hdf5 file, generate ANmodel nervegrams, and copy specified datasets
     from source to destination hdf5 file.
@@ -268,9 +297,14 @@ def run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=0
     print('>>> [END] {}'.format(dest_hdf5_filename))
 
 
-def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs_per_source_file=10,
-                                    source_key_signal='/signal', source_key_signal_fs='/signal_rate',
-                                    source_keys_to_copy=[], **kwargs):
+def parallel_run_dataset_generation(source_regex,
+                                    dest_filename,
+                                    job_idx=0,
+                                    jobs_per_source_file=10,
+                                    source_key_signal='/signal',
+                                    source_key_signal_fs='/signal_rate',
+                                    source_keys_to_copy=[],
+                                    **kwargs):
     '''
     Wrapper function to easily parallelize `run_dataset_generation()`.
     
@@ -314,6 +348,11 @@ def parallel_run_dataset_generation(source_regex, dest_filename, job_idx=0, jobs
         job_idx, source_file_idx, len(source_fn_list), jobs_per_source_file))
     print('>>> [PARALLEL_RUN] source_hdf5_filename: {}'.format(source_hdf5_filename))
     print('>>> [PARALLEL_RUN] dest_hdf5_filename: {}'.format(dest_hdf5_filename))
-    run_dataset_generation(source_hdf5_filename, dest_hdf5_filename, idx_start=idx_start, idx_end=idx_end,
-                           source_key_signal=source_key_signal, source_key_signal_fs=source_key_signal_fs,
-                           source_keys_to_copy=source_keys_to_copy, **kwargs)
+    run_dataset_generation(source_hdf5_filename,
+                           dest_hdf5_filename,
+                           idx_start=idx_start,
+                           idx_end=idx_end,
+                           source_key_signal=source_key_signal,
+                           source_key_signal_fs=source_key_signal_fs,
+                           source_keys_to_copy=source_keys_to_copy,
+                           **kwargs)
