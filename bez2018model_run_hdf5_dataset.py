@@ -218,13 +218,17 @@ def generate_nervegram_meanrates(hdf5_filename,
         signal = list_signal[idx]
         if list_snr is not None:
             snr = list_snr[idx]
+            # De-mean signal and noise to ensure valid RMS computations
             signal = signal - np.mean(signal)
             noise = list_noise[idx] - np.mean(list_noise[idx])
-            if np.isinf(snr) and snr < 0:
-                signal = noise
-            elif np.isinf(snr) and snr > 0:
+            if np.isinf(snr) and snr > 0:
+                # If SNR is positive infinity, do not add noise to signal
                 signal = signal
+            elif np.isinf(snr) and snr < 0:
+                # If SNR is negative infinity, replace signal with noise
+                signal = noise
             else:
+                # Otherwise keep signal level fixed and add re-scaled noise
                 rms_signal = np.sqrt(np.mean(np.square(signal)))
                 rms_noise = np.sqrt(np.mean(np.square(noise)))
                 rms_noise_scaling = rms_signal / (rms_noise * np.power(10, snr / 20))
@@ -336,7 +340,13 @@ def run_dataset_generation(source_hdf5_filename,
 
     # Run the main ANmodel nervegram generation routine
     print('>>> [START] {}'.format(dest_hdf5_filename))
-    generate_nervegram_meanrates(dest_hdf5_filename, list_signal, signal_fs, **kwargs)
+    generate_nervegram_meanrates(dest_hdf5_filename,
+                                 list_signal,
+                                 signal_fs,
+                                 list_snr=list_snr,
+                                 list_noise=list_noise,
+                                 list_dbspl=list_dbspl,
+                                 **kwargs)
 
     # Copy specified datasets from source hdf5 file to destination hdf5 file
     dsets_to_copy = {}
