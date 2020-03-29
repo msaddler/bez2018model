@@ -229,7 +229,7 @@ def generate_nervegram_meanrates(hdf5_filename,
 
     # Main loop: iterate over all signals
     for idx in range(start_idx, N):
-        # Construct and preprocess signal as specified
+        # Preprocess input signal as specified
         signal = list_signal[idx]
         if list_snr is not None:
             snr = list_snr[idx]
@@ -318,17 +318,17 @@ def run_dataset_generation(source_hdf5_filename,
 
     Args
     ----
-    source_hdf5_filename (str): filename for hdf5 dataset providing the stimuli
+    source_hdf5_filename (str): filename for hdf5 dataset providing the ANmodel inputs
     dest_hdf5_filename (str): filename for hdf5 dataset in which to store ANmodel outputs
     idx_start (int): specifies first stimulus in source_hdf5_filename to process
     idx_end (int or None): upper limit of stimulus range in source_hdf5_filename to process
     source_key_signal (str): key for signal dataset in source_hdf5_filename
-    source_key_signal_fs (str): key for stimulus sampling rate in source_hdf5_filename
+    source_key_signal_fs (str): key for signal sampling rate in source_hdf5_filename
     source_key_snr (str): key for stimulus SNR dataset (source_key_noise is ignored if None)
     source_key_noise (str): key for noise dataset in source_hdf5_filename (required if source_key_snr is specified)
     source_key_dbspl (str): key for stimulus dB SPL dataset in source_hdf5_filename
     source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
-    range_dbspl (list): min / max sound presentation level (only used if source_key_dbspl is None)
+    range_dbspl (list): min and max sound presentation level (only used if source_key_dbspl is None)
     **kwargs (passed directly to `generate_nervegram_meanrates()`)
     '''
     # Ensure source and destination filenames are different and open the source hdf5 file
