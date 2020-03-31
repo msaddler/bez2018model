@@ -4,6 +4,7 @@ import bez2018model
 import numpy as np
 import h5py
 import glob
+import time
 import copy
 import collections
 import dask.array
@@ -228,6 +229,7 @@ def generate_nervegram_meanrates(hdf5_filename,
         hdf5_f = h5py.File(hdf5_filename, 'r+')
 
     # Main loop: iterate over all signals
+    time_start = time.time()
     for idx in range(start_idx, N):
         # Preprocess input signal as specified
         signal = list_signal[idx]
@@ -293,7 +295,8 @@ def generate_nervegram_meanrates(hdf5_filename,
         if idx % disp_step == 0:
             hdf5_f.close()
             hdf5_f = h5py.File(hdf5_filename, 'r+')
-            print('... signal {:06d} of {:06d} ({:.2f} dB SPL)'.format(idx, N, data_dict['pin_dBSPL']))
+            disp_str = '... signal {:06d} of {:06d} ({:.2f} dB SPL) | wall-clock time={:.0f} s'
+            print(disp_str.format(idx, N, data_dict['pin_dBSPL'], time.time()-time_start))
 
     # Close the hdf5 dataset for the last time
     hdf5_f.close()
