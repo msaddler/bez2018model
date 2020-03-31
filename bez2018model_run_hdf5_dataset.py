@@ -229,7 +229,7 @@ def generate_nervegram_meanrates(hdf5_filename,
         hdf5_f = h5py.File(hdf5_filename, 'r+')
 
     # Main loop: iterate over all signals
-    time_start = time.time()
+    t_start = time.time()
     for idx in range(start_idx, N):
         # Preprocess input signal as specified
         signal = list_signal[idx]
@@ -295,8 +295,11 @@ def generate_nervegram_meanrates(hdf5_filename,
         if idx % disp_step == 0:
             hdf5_f.close()
             hdf5_f = h5py.File(hdf5_filename, 'r+')
-            disp_str = '... signal {:06d} of {:06d} ({:.2f} dB SPL) | wall-clock time={:.0f} s'
-            print(disp_str.format(idx, N, data_dict['pin_dBSPL'], time.time()-time_start))
+            t_mean_per_signal = (time.time() - t_start) / (idx - start_idx + 1) # Seconds per signal
+            t_est_remaining = (N - idx - 1) * t_mean_per_signal / 60.0 # Estimated minutes remaining
+            disp_str = ('... signal {:06d} of {:06d} | dB SPL: {:02.2f} | '
+                        'time_mean_per_signal: {:02.2f} sec | time_est_remaining: {:06.0f} min')
+            print(disp_str.format(idx, N, data_dict['pin_dBSPL'], t_mean_per_signal, t_est_remaining))
 
     # Close the hdf5 dataset for the last time
     hdf5_f.close()
