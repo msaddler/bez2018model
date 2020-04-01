@@ -95,9 +95,14 @@ def nervegram_meanrates(signal,
     
     # If pin_dBSPL_flag, scale pin to desired dB SPL (otherwise compute dB SPL)
     if pin_dBSPL_flag:
+        pin = pin - np.mean(pin)
+        pin_rms = np.sqrt(np.mean(np.square(pin)))
         desired_rms = 2e-5 * np.power(10, pin_dBSPL / 20)
-        pin = pin - np.mean(mean)
-        pin = desired_rms * (pin / np.sqrt(np.mean(np.square(pin))))
+        if pin_rms > 0:
+            pin = desired_rms * (pin / pin_rms)
+        else:
+            pin_dBSPL = -np.inf
+            print('>>> [WARNING] rms(pin) = 0 (silent input signal)')
     else:
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
     
