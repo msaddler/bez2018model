@@ -51,8 +51,8 @@ def initialize_hdf5_file(hdf5_filename,
                          dtype=np.float32,
                          cast_data=True,
                          cast_config=False,
-                         compression='gzip',
-                         compression_opts=9):
+                         compression=None,
+                         compression_opts=None):
     '''
     Create a new hdf5 file and populate config parameters.
 
@@ -67,11 +67,16 @@ def initialize_hdf5_file(hdf5_filename,
     dtype (np.dtype object): datatype for casting data and/or config values
     cast_data (bool): if True, fields corresponding to data_key_pair_list will be cast to dtype
     cast_config (bool): if True, fields corresponding to config_key_pair_list will be cast to dtype
-    compression (str): specifies compression filter applied to hdf5 datasets (default is 'gzip')
+    compression (str): if not None, specifies compression filter for  hdf5 datasets (example: 'gzip')
     compression_opts (int): options for compression filter (for 'gzip', sets compression level: 0 to 9)
     '''
     # Initialize hdf5 file
     f = h5py.File(hdf5_filename, file_mode)
+    kwargs_create_dataset = {}
+    if compression is not None:
+        kwargs_create_dataset['compression'] = compression
+    if compression_opts is not None:
+        kwargs_create_dataset['compression_opts'] = compression_opts
     # Create the main output datasets
     for (hdf5_key, data_key) in data_key_pair_list:
         data_key_value = np.squeeze(np.array(data_dict[data_key]))
@@ -81,8 +86,7 @@ def initialize_hdf5_file(hdf5_filename,
         f.create_dataset(hdf5_key,
                          data_key_shape,
                          dtype=data_key_value.dtype,
-                         compression=compression,
-                         compression_opts=compression_opts)
+                         **kwargs_create_dataset)
     # Create and populate the config datasets
     for (hdf5_key, config_key) in config_key_pair_list:
         config_key_value = np.squeeze(np.array(data_dict[config_key]))
@@ -93,8 +97,7 @@ def initialize_hdf5_file(hdf5_filename,
                          config_key_shape,
                          dtype=config_key_value.dtype,
                          data=config_key_value,
-                         compression=compression,
-                         compression_opts=compression_opts)
+                         **kwargs_create_dataset)
     # Close the initialized hdf5 file
     f.close()
 
