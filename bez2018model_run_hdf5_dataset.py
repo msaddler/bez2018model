@@ -50,7 +50,9 @@ def initialize_hdf5_file(hdf5_filename,
                          config_key_pair_list=[],
                          dtype=np.float32,
                          cast_data=True,
-                         cast_config=False):
+                         cast_config=False,
+                         compression='gzip',
+                         compression_opts=9):
     '''
     Create a new hdf5 file and populate config parameters.
 
@@ -65,6 +67,8 @@ def initialize_hdf5_file(hdf5_filename,
     dtype (np.dtype object): datatype for casting data and/or config values
     cast_data (bool): if True, fields corresponding to data_key_pair_list will be cast to dtype
     cast_config (bool): if True, fields corresponding to config_key_pair_list will be cast to dtype
+    compression (str): specifies compression filter applied to hdf5 datasets (default is 'gzip')
+    compression_opts (int): options for compression filter (for 'gzip', sets compression level: 0 to 9)
     '''
     # Initialize hdf5 file
     f = h5py.File(hdf5_filename, file_mode)
@@ -74,7 +78,11 @@ def initialize_hdf5_file(hdf5_filename,
         if cast_data:
             data_key_value = data_key_value.astype(dtype)
         data_key_shape = [N] + list(data_key_value.shape)
-        f.create_dataset(hdf5_key, data_key_shape, dtype=data_key_value.dtype)
+        f.create_dataset(hdf5_key,
+                         data_key_shape,
+                         dtype=data_key_value.dtype,
+                         compression=compression,
+                         compression_opts=compression_opts)
     # Create and populate the config datasets
     for (hdf5_key, config_key) in config_key_pair_list:
         config_key_value = np.squeeze(np.array(data_dict[config_key]))
@@ -84,7 +92,9 @@ def initialize_hdf5_file(hdf5_filename,
         f.create_dataset(hdf5_key,
                          config_key_shape,
                          dtype=config_key_value.dtype,
-                         data=config_key_value)
+                         data=config_key_value,
+                         compression=compression,
+                         compression_opts=compression_opts)
     # Close the initialized hdf5 file
     f.close()
 
