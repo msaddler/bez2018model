@@ -396,7 +396,7 @@ def run_dataset_generation(source_hdf5_filename,
             if source_hdf5_f[key].shape[0] == 1:
                 key_dset = source_hdf5_f[key]
             else:
-                key_dset = source_hdf5_f[key][idx_start : idx_end]
+                key_dset = source_hdf5_f[key][idx_start:idx_end]
             dsets_to_copy[key] = dask.array.from_array(key_dset, chunks=key_dset.shape)
             print('>>> [COPYING FROM SOURCE]: {}'.format(key), dsets_to_copy[key].shape)
     if dsets_to_copy:
