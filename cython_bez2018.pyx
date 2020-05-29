@@ -86,7 +86,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     
     Returns
     -------
-    ihcout (np.float64 array): IHC relative transmembrane potential (in volts)
+    ihcout (np.float64 array): IHC membrane potential (in volts)
     """
     # Check arguments
     assert species in [1, 2, 3], ("species must be in [1, 2, 3]:\n"
@@ -143,7 +143,7 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
 
     Args
     ----
-    vihc (np.float64 array): IHC relative transmembrane potential (in volts)
+    vihc (np.float64 array): IHC membrane potential (in volts)
     fs (float): sampling rate in Hz
     cf (float): characteristic frequency in Hz
     noiseType (float): set to 0 for noiseless and 1 for variable fGn
@@ -158,6 +158,7 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         'synout': synapse output rate in /s (before redocking effects are considered)
         'meanrate': analytical estimate of the instantaneous mean firing rate in /s
         'varrate': analytical estimate of the instantaneous variance in firing rate in /s
+	'psth': peristimulus time histogram of spikes
         'trd_vector': vector of the mean redocking time in seconds
         'trel_vector': vector of the mean relative refractory period in seconds
     """
