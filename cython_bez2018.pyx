@@ -59,7 +59,7 @@ cdef extern from "model_Synapse_BEZ2018.h":
     )
 
 cdef extern from "model_Synapse_BEZ2018.h":
-    void Synapse(
+    double Synapse(
         double *ihcout,
         double tdres,
         double cf,
@@ -232,7 +232,7 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         psth_data,          #double *psth,
         synout_data,        #double *synout,
         trd_vector_data,    #double *trd_vector,
-        trel_vector_data     #double *trel_vector
+        trel_vector_data    #double *trel_vector
     )
     output_dict = {
         'synout': synout,
@@ -243,6 +243,80 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         'trel_vector': trel_vector
     }
     return output_dict
+
+
+def tmp_test(
+        np.ndarray[np.float64_t, ndim=1] vihc,
+        double fs,
+        double cf,
+        double noiseType=1.,
+        double implnt=0.,
+        double spont=70.,
+        double tabs=0.6e-3,
+        double trel=0.6e-3):
+    """
+    """
+    # Ensure input array (IHC voltage) is C contiguous and initialize pointer
+    if not vihc.flags['C_CONTIGUOUS']:
+        vihc = vihc.copy(order='C')
+    cdef double *vihc_data = <double *>np.PyArray_DATA(vihc)
+    
+    # Initialize output arrays and data pointers
+    synout = np.zeros_like(vihc) # (spiking probabilities)
+    cdef double *synout_data = <double *>np.PyArray_DATA(synout)
+    trd_vector = np.zeros_like(vihc) # (mean synaptic redocking times)
+    cdef double *trd_vector_data = <double *>np.PyArray_DATA(trd_vector)
+    
+    # Call the synapse function
+    tdres = 1/fs
+    totalstim = len(vihc)
+    nrep = 1
+    sampFreq = 10e3
+    I = Synapse(
+        vihc_data,
+        tdres,
+        cf,
+        totalstim,
+        nrep,
+        spont,
+        noiseType,
+        implnt,
+        sampFreq,
+        synout_data)
+    
+    # Call the spike-generator function
+    nSites = 4 # number of synpatic release sites
+    t_rd_rest = 14.0e-3 # resting value of the mean redocking time
+    t_rd_jump = 0.4e-3 # size of jump in mean redocking time when a redocking event occurs
+    t_rd_init = t_rd_rest + 0.02e-3 * spont - t_rd_jump # initial value of the mean redocking time
+    tau = 60.0e-3 # time constant for short-term adaptation (in mean redocking time)
+    total_mean_rate = np.sum(synout) / I # calculate the overall mean synaptic rate
+    
+    MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
+    SignalLength = totalstim * nrep * tdres
+    MaxArraySizeSpikes = np.long(np.ceil(SignalLength / MeanISI + 3 * np.sqrt(SignalLength/MeanISI)))
+    sptime = np.zeros([int(MaxArraySizeSpikes)], dtype=vihc.dtype)
+    cdef double *sptime_data = <double *>np.PyArray_DATA(sptime)
+    
+    nspikes = SpikeGenerator(
+        synout_data,
+        tdres,
+        t_rd_rest,
+        t_rd_init,
+        tau,
+        t_rd_jump,
+        nSites,
+        tabs,
+        trel,
+        spont,
+        totalstim,
+        nrep,
+        total_mean_rate,
+        MaxArraySizeSpikes,
+        sptime_data,
+        trd_vector_data)
+    
+    return {'sptime':sptime, 'synout':synout, 'trd_vector':trd_vector}
 
 
 cdef public double* generate_random_numbers(long length):
