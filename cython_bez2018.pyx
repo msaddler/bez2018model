@@ -58,6 +58,40 @@ cdef extern from "model_Synapse_BEZ2018.h":
         double *trel_vector
     )
 
+cdef extern from "model_Synapse_BEZ2018.h":
+    void Synapse(
+        double *ihcout,
+        double tdres,
+        double cf,
+        int totalstim,
+        int nrep,
+        double spont,
+        double noiseType,
+        double implnt,
+        double sampFreq,
+        double *synout
+    )
+
+cdef extern from "model_Synapse_BEZ2018.h":
+    int SpikeGenerator(
+        double *synout,
+        double tdres,
+        double t_rd_rest,
+        double t_rd_init,
+        double tau,
+        double t_rd_jump,
+        int nSites,
+        double tabs,
+        double trel,
+        double spont,
+        int totalstim,
+        int nrep,
+        double total_mean_rate,
+        long MaxArraySizeSpikes,
+        double *sptime,
+        double *trd_vector
+    )
+
 
 def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
             double fs,
@@ -158,7 +192,7 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         'synout': synapse output rate in /s (before redocking effects are considered)
         'meanrate': analytical estimate of the instantaneous mean firing rate in /s
         'varrate': analytical estimate of the instantaneous variance in firing rate in /s
-	'psth': peristimulus time histogram of spikes
+    'psth': peristimulus time histogram of spikes
         'trd_vector': vector of the mean redocking time in seconds
         'trel_vector': vector of the mean relative refractory period in seconds
     """
@@ -198,7 +232,7 @@ def run_synapse(np.ndarray[np.float64_t, ndim=1] vihc,
         psth_data,          #double *psth,
         synout_data,        #double *synout,
         trd_vector_data,    #double *trd_vector,
-        trd_vector_data     #double *trel_vector
+        trel_vector_data     #double *trel_vector
     )
     output_dict = {
         'synout': synout,
