@@ -253,7 +253,9 @@ def tmp_test(
         double implnt=0.,
         double spont=70.,
         double tabs=0.6e-3,
-        double trel=0.6e-3):
+        double trel=0.6e-3,
+        long max_spikes_per_train=-1,
+        int n_spike_trains=1):
     """
     """
     # Ensure input array (IHC voltage) is C contiguous and initialize pointer
@@ -273,7 +275,7 @@ def tmp_test(
     tau = 60.0e-3 # time constant for short-term adaptation (in mean redocking time)
     
     # Initialize `synout` array and data pointer
-    synout = np.zeros_like(vihc) # (spiking probabilities)
+    synout = np.zeros_like(vihc) # spiking probabilities
     cdef double *synout_data = <double *>np.PyArray_DATA(synout)
     
     # Call the Synapse function
@@ -289,46 +291,53 @@ def tmp_test(
         sampFreq,
         synout_data)
     
-    # Initialize `sptime` output array with length equal to `MaxArraySizeSpikes`
+    # Initialize `sptime` output array with length equal to `max_spikes_per_train`
     total_mean_rate = np.sum(synout) / I # calculate the overall mean synaptic rate
-    MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
-    SignalLength = totalstim * nrep * tdres
-    MaxArraySizeSpikes = np.long(np.ceil(SignalLength / MeanISI + 3 * np.sqrt(SignalLength/MeanISI)))
-    sptime = np.zeros([int(MaxArraySizeSpikes)], dtype=vihc.dtype)
+    if max_spikes_per_train < 0:
+        MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
+        SignalLength = totalstim * nrep * tdres
+        max_spikes_per_train = np.long(np.ceil(SignalLength / MeanISI + 3 * np.sqrt(SignalLength/MeanISI)))
+    sptime = np.zeros([max_spikes_per_train], dtype=vihc.dtype)
     cdef double *sptime_data = <double *>np.PyArray_DATA(sptime)
     
     # Initialize `trd_vector` output array and data pointer
-    trd_vector = np.zeros_like(vihc) # (mean synaptic redocking times)
+    trd_vector = np.zeros_like(vihc) # mean synaptic redocking times
     cdef double *trd_vector_data = <double *>np.PyArray_DATA(trd_vector)
     
-    # Call the SpikeGenerator function
-    nspikes = SpikeGenerator(
-        synout_data,
-        tdres,
-        t_rd_rest,
-        t_rd_init,
-        tau,
-        t_rd_jump,
-        nSites,
-        tabs,
-        trel,
-        spont,
-        totalstim,
-        nrep,
-        total_mean_rate,
-        MaxArraySizeSpikes,
-        sptime_data,
-        trd_vector_data)
+    # Call the SpikeGenerator function once for each spike train
+    spike_times = np.zeros([n_spike_trains, max_spikes_per_train], dtype=vihc.dtype)
+    for itr_n in range(n_spike_trains):
+        sptime[:] = 0 # reset sptime for each call to SpikeGenerator
+        trd_vector[:] = 0 # reset trd_vector for each call to SpikeGenerator
+        nspikes = SpikeGenerator(
+            synout_data,
+            tdres,
+            t_rd_rest,
+            t_rd_init,
+            tau,
+            t_rd_jump,
+            nSites,
+            tabs,
+            trel,
+            spont,
+            totalstim,
+            nrep,
+            total_mean_rate,
+            max_spikes_per_train,
+            sptime_data,
+            trd_vector_data)
+        spike_times[itr_n] = sptime
+        
+        if itr_n == 0:
+            # Estimate instantaneous mean firing rate on first iteration
+            IDX = synout > 0
+            meanrate = np.zeros_like(vihc)
+            trel_vector = np.ones_like(vihc) * trel
+            trel_vector[IDX] = trel * 100 / synout[IDX]
+            trel_vector[trel_vector > trel] = trel
+            meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
     
-    # Analytic estimate of instantaneous firing rate
-    IDX = synout > 0
-    meanrate = np.zeros_like(vihc)
-    trel_vector = np.ones_like(vihc) * trel
-    trel_vector[IDX] = trel * 100 / synout[IDX]
-    trel_vector[trel_vector > trel] = trel
-    meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
-    
-    return {'sptime':sptime, 'synout':synout, 'trd_vector':trd_vector, 'meanrate': meanrate}
+    return {'spike_times':spike_times, 'synout':synout, 'trd_vector':trd_vector, 'meanrate': meanrate}
 
 
 cdef public double* generate_random_numbers(long length):
