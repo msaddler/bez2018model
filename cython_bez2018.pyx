@@ -123,10 +123,11 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     ihcout (np.float64 array): IHC membrane potential (in volts)
     """
     # Check arguments
-    assert species in [1, 2, 3], ("species must be in [1, 2, 3]:\n"
-                                  "\t1 = cat,\n"
-                                  "\t2 = human: Shera et al. (PNAS 2002)\n"
-                                  "\t3 = human: Glasberg & Moore (Hear. Res. 1990)\n")
+    assert species in [1, 2, 3, 4], ("species must be in [1, 2, 3]:\n"
+                                     "\t1 = cat,\n"
+                                     "\t2 = human: Shera et al. (PNAS 2002)\n"
+                                     "\t3 = human: Glasberg & Moore (Hear. Res. 1990)\n"
+                                     "\t4 = custom: bw = bandwidth_scale_factor")
     if species == 1:
         assert (cf > 124.9) and (cf < 40e3), "CF out of range for cat (125Hz to 40kHz)"
     else:
