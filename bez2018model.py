@@ -302,28 +302,38 @@ def nervegram(signal,
     if return_spike_times:
         nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
 
-#     # ====== APPLY MANIPULATIONS ====== #
-#     # Randomly clip a segment of duration nervegram_dur from the larger nervegram
-#     (clip_start_nervegram, clip_end_nervegram) = (0, decimated_pin.shape[0])
-#     (clip_start_pin, clip_end_pin) = (0, pin.shape[0])
-#     (signal_clip_start, signal_clip_end) = (0, signal.shape[0])
-#     if (nervegram_dur is not None) and (nervegram_dur < signal_dur):
-#         buffer_start_idx = np.ceil(buffer_start_dur * nervegram_fs)
-#         buffer_end_idx = decimated_pin.shape[0] - np.floor(buffer_end_dur*nervegram_fs)
-#         clip_start_nervegram = np.random.randint(buffer_start_idx,
-#                                                  high=buffer_end_idx-nervegram_dur*nervegram_fs)
-#         clip_end_nervegram = clip_start_nervegram + int(np.ceil(nervegram_dur*nervegram_fs))
-#         assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
-#         nervegram_psth = nervegram_psth[:, clip_start_nervegram:clip_end_nervegram]
-#         nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
-#         # Clip analogous segment of pin (stimulus provided to ANmodel)
-#         clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
-#         clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
-#         pin = pin[clip_start_pin:clip_end_pin]
-#         # Clip analogous segment of signal (input stimulus)
-#         clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
-#         clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
-#         signal = signal[clip_start_signal:clip_end_signal]
+    # ====== APPLY MANIPULATIONS ====== #
+    if nervegram_dur is not None:
+        buffer_start_idx = int(buffer_start_dur*nervegram_fs)
+        buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
+        clip_start_nervegram = np.random.randint(buffer_start_idx,
+                                                 high=buffer_end_idx-nervegram_dur*nervegram_fs)
+        clip_end_nervegram = clip_start_nervegram + int(nervegram_dur*nervegram_fs)
+        assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
+        
+        # Clip analogous segment of signal (input stimulus)
+        clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
+        clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
+        signal = signal[clip_start_signal:clip_end_signal]
+        
+        # Clip analogous segment of pin (stimulus provided to ANmodel)
+        clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
+        clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
+        pin = pin[clip_start_pin:clip_end_pin]
+        
+        # Clip segment of vihcs (inner hair cell potential)
+        if return_vihcs:
+            nervegram_vihcs = nervegram_vihcs[:, clip_start_nervegram:clip_end_nervegram]
+        # Clip segment of meanrates (instantaneous firing rate)
+        if return_meanrates:
+            nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
+        # Adjust spike times
+        if return_spike_times:
+            clip_start_nervegram_time = clip_start_nervegram / nervegram_fs
+            clip_end_nervegram_time = clip_end_nervegram / nervegram_fs
+            nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
+            nervegram_spike_times = nervegram_spike_times - clip_start_nervegram_time
+            nervegram_spike_times[nervegram_spike_times < 0] = 0
 
     # ====== ORGANIZE output_dict ====== #
     output_dict = {
@@ -331,9 +341,9 @@ def nervegram(signal,
         'signal_fs': signal_fs,
         'pin': pin.astype(np.float32),
         'pin_fs': pin_fs,
-        'nervegram_vihcs': nervegram_vihcs.astype(np.float32),
-        'nervegram_meanrates': nervegram_meanrates.astype(np.float32),
-        'nervegram_spike_times': nervegram_spike_times.astype(np.float32),
+        'nervegram_vihcs': nervegram_vihcs,
+        'nervegram_meanrates': nervegram_meanrates,
+        'nervegram_spike_times': nervegram_spike_times,
         'nervegram_fs': nervegram_fs,
         'nervegram_dur': nervegram_dur,
         'cf_list': np.array(cf_list).astype(np.float32),
