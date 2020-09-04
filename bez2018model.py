@@ -206,7 +206,8 @@ def nervegram(signal,
               random_seed=None,
               return_vihcs=True,
               return_meanrates=True,
-              return_spike_times=True):
+              return_spike_times=True,
+              return_spike_tensor=False):
     '''
     Main function for generating an auditory nervegram.
 
@@ -301,9 +302,13 @@ def nervegram(signal,
         nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
     if return_spike_times:
         nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
+    if return_spike_tensor:
+        assert return_spike_times, "return_spike_times must be true to return_spike_tensor"
 
     # ====== APPLY MANIPULATIONS ====== #
-    if nervegram_dur is not None:
+    if nervegram_dur is None:
+        nervegram_dur = signal_dur
+    else:
         # Compute clip segment start and end indices
         buffer_start_idx = int(buffer_start_dur*nervegram_fs)
         buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
@@ -332,6 +337,7 @@ def nervegram(signal,
             nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
             nervegram_spike_times = nervegram_spike_times - clip_start_nervegram_time
             nervegram_spike_times[nervegram_spike_times < 0] = 0
+            # Re-order spike times to eliminate leading zeros (spike cannot occur at t=0)
             for itr0 in range(nervegram_spike_times.shape[0]):
                 for itr1 in range(nervegram_spike_times.shape[1]):
                     spike_times = nervegram_spike_times[itr0, itr1, :]
