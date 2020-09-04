@@ -207,7 +207,7 @@ def nervegram(signal,
               return_vihcs=True,
               return_meanrates=True,
               return_spike_times=True,
-              return_spike_tensor=False):
+              return_spike_tensor=True):
     '''
     Main function for generating an auditory nervegram.
 
@@ -218,7 +218,7 @@ def nervegram(signal,
     -------
     output_dict (dict): contains nervegram, stimulus, and all parameters
     '''
-    # ====== PARSE ARGUMENTS ====== #
+    # ============ PARSE ARGUMENTS ============ #
     # If specified, set random seed (eliminates stochasticity in ANmodel noise)
     if not (random_seed == None):
         np.random.seed(random_seed)
@@ -236,7 +236,7 @@ def nervegram(signal,
     msg = "cf_list and bandwidth_scale_factor must have the same length"
     assert len(bandwidth_scale_factor) == len(cf_list), msg
 
-    # ====== RESAMPLE AND RESCALE INPUT SIGNAL ====== #
+    # ============ RESAMPLE AND RESCALE INPUT SIGNAL ============ #
     # Resample the input signal to pin_fs (at least 100kHz) for ANmodel
     pin = scipy.signal.resample_poly(signal, int(pin_fs), int(signal_fs))
     # If pin_dBSPL_flag, scale pin to desired dB SPL (otherwise compute dB SPL)
@@ -252,7 +252,7 @@ def nervegram(signal,
     else:
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
 
-    # ====== RUN AUDITORY NERVE MODEL ====== #
+    # ============ RUN AUDITORY NERVE MODEL ============ #
     # Initialize output array lists
     if return_vihcs:
         nervegram_vihcs = []
@@ -302,11 +302,9 @@ def nervegram(signal,
         nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
     if return_spike_times:
         nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
-    if return_spike_tensor:
-        assert return_spike_times, "return_spike_times must be true to return_spike_tensor"
 
-    # ====== APPLY MANIPULATIONS ====== #
-    if nervegram_dur is None:
+    # ============ APPLY TRANSFORMATIONS ============ #
+    if (nervegram_dur is None) or (nervegram_dur == signal_dur):
         nervegram_dur = signal_dur
     else:
         # Compute clip segment start and end indices
@@ -344,16 +342,23 @@ def nervegram(signal,
                     spike_times = spike_times[spike_times > 0]
                     nervegram_spike_times[itr0, itr1, :] = 0
                     nervegram_spike_times[itr0, itr1, 0:spike_times.shape[0]] = spike_times
+    # Generate binary tensor of spikes (with shape [spiketrain, CF, time]) from spike times
+    if return_spike_tensor:
+        assert return_spike_times, "`return_spike_times` must be true to generate spike tensor"
+        nervegram_spike_indices = (nervegram_spike_times * nervegram_fs).astype(int)
+        out_shape = list(nervegram_spike_indices.shape)[:-1] + [int(nervegram_dur*nervegram_fs)]
+        nervegram_spike_tensor = np.zeros(out_shape, dtype=int)
+        for itr0 in range(nervegram_spike_indices.shape[0]):
+            for itr1 in range(nervegram_spike_indices.shape[1]):
+                indices = np.trim_zeros(nervegram_spike_indices[itr0, itr1], trim='b')
+                nervegram_spike_tensor[itr0, itr1, indices] = 1
 
-    # ====== ORGANIZE output_dict ====== #
+    # ============ RETURN OUTPUT AS DICTIONARY ============ #
     output_dict = {
         'signal': signal.astype(np.float32),
         'signal_fs': signal_fs,
         'pin': pin.astype(np.float32),
         'pin_fs': pin_fs,
-        'nervegram_vihcs': nervegram_vihcs,
-        'nervegram_meanrates': nervegram_meanrates,
-        'nervegram_spike_times': nervegram_spike_times,
         'nervegram_fs': nervegram_fs,
         'nervegram_dur': nervegram_dur,
         'cf_list': np.array(cf_list).astype(np.float32),
@@ -373,4 +378,12 @@ def nervegram(signal,
         'tabs': tabs,
         'trel': trel,
     }
+    if return_vihcs:
+        output_dict['nervegram_vihcs'] = nervegram_vihcs
+    if return_meanrates:
+        output_dict['nervegram_meanrates'] = nervegram_meanrates
+    if return_spike_times:
+        output_dict['nervegram_spike_times'] = nervegram_spike_times
+    if return_spike_tensor:
+        output_dict['nervegram_spike_tensor'] = nervegram_spike_tensor
     return output_dict
