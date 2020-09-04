@@ -19,7 +19,7 @@ def get_ERB_cf_list(num_cf, min_cf=125.0, max_cf=8e3):
     '''
     E_start = 21.4 * np.log10(0.00437 * min_cf + 1.0)
     E_end = 21.4 * np.log10(0.00437 * max_cf + 1.0)
-    cf_list = np.linspace(E_start, E_end, num = num_cfs)
+    cf_list = np.linspace(E_start, E_end, num=num_cf)
     cf_list = (1.0/0.00437) * (10.0 ** (cf_list / 21.4) - 1.0)
     return list(cf_list)
 
@@ -251,9 +251,8 @@ def nervegram(signal,
     else:
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
 
-    # ======================== RUN AUDITORY NERVE MODEL ======================== #
-    # Initialize outputs (downsample pin to get the correct time dimension length)
-    nervegram_pin = scipy.signal.resample_poly(pin, int(nervegram_fs), int(pin_fs))
+    # ====== RUN AUDITORY NERVE MODEL ====== #
+    # Initialize output array lists
     if return_vihcs:
         nervegram_vihcs = []
     if return_meanrates:
@@ -292,50 +291,59 @@ def nervegram(signal,
             tmp_meanrate[tmp_meanrate < 0] = 0
             nervegram_meanrates.append(tmp_meanrate)
         if return_spike_times:
-            tmp_spike_times = synapse_out['meanrate']
+            tmp_spike_times = synapse_out['spike_times']
             nervegram_spike_times.append(tmp_spike_times)
 
-    # ======================== APPLY MANIPULATIONS ======================== #
-    # Randomly clip a segment of duration nervegram_dur from the larger nervegram
-    (clip_start_nervegram, clip_end_nervegram) = (0, decimated_pin.shape[0])
-    (clip_start_pin, clip_end_pin) = (0, pin.shape[0])
-    (signal_clip_start, signal_clip_end) = (0, signal.shape[0])
-    if (nervegram_dur is not None) and (nervegram_dur < signal_dur):
-        buffer_start_idx = np.ceil(buffer_start_dur * nervegram_fs)
-        buffer_end_idx = decimated_pin.shape[0] - np.floor(buffer_end_dur*nervegram_fs)
-        clip_start_nervegram = np.random.randint(buffer_start_idx,
-                                                 high=buffer_end_idx-nervegram_dur*nervegram_fs)
-        clip_end_nervegram = clip_start_nervegram + int(np.ceil(nervegram_dur*nervegram_fs))
-        assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
-        nervegram_psth = nervegram_psth[:, clip_start_nervegram:clip_end_nervegram]
-        nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
-        # Clip analogous segment of pin (stimulus provided to ANmodel)
-        clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
-        clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
-        pin = pin[clip_start_pin:clip_end_pin]
-        # Clip analogous segment of signal (input stimulus)
-        clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
-        clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
-        signal = signal[clip_start_signal:clip_end_signal]
+    # Combine output arrays across CFs
+    if return_vihcs:
+        nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
+    if return_meanrates:
+        nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
+    if return_spike_times:
+        nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
 
-    # ======================== ORGANIZE output_dict ======================== #
+#     # ====== APPLY MANIPULATIONS ====== #
+#     # Randomly clip a segment of duration nervegram_dur from the larger nervegram
+#     (clip_start_nervegram, clip_end_nervegram) = (0, decimated_pin.shape[0])
+#     (clip_start_pin, clip_end_pin) = (0, pin.shape[0])
+#     (signal_clip_start, signal_clip_end) = (0, signal.shape[0])
+#     if (nervegram_dur is not None) and (nervegram_dur < signal_dur):
+#         buffer_start_idx = np.ceil(buffer_start_dur * nervegram_fs)
+#         buffer_end_idx = decimated_pin.shape[0] - np.floor(buffer_end_dur*nervegram_fs)
+#         clip_start_nervegram = np.random.randint(buffer_start_idx,
+#                                                  high=buffer_end_idx-nervegram_dur*nervegram_fs)
+#         clip_end_nervegram = clip_start_nervegram + int(np.ceil(nervegram_dur*nervegram_fs))
+#         assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
+#         nervegram_psth = nervegram_psth[:, clip_start_nervegram:clip_end_nervegram]
+#         nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
+#         # Clip analogous segment of pin (stimulus provided to ANmodel)
+#         clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
+#         clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
+#         pin = pin[clip_start_pin:clip_end_pin]
+#         # Clip analogous segment of signal (input stimulus)
+#         clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
+#         clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
+#         signal = signal[clip_start_signal:clip_end_signal]
+
+    # ====== ORGANIZE output_dict ====== #
     output_dict = {
         'signal': signal.astype(np.float32),
         'signal_fs': signal_fs,
         'pin': pin.astype(np.float32),
         'pin_fs': pin_fs,
-        'cf_list': np.array(cf_list).astype(np.float32),
-        'nervegram_psth': nervegram_psth,
+        'nervegram_vihcs': nervegram_vihcs.astype(np.float32),
         'nervegram_meanrates': nervegram_meanrates.astype(np.float32),
+        'nervegram_spike_times': nervegram_spike_times.astype(np.float32),
         'nervegram_fs': nervegram_fs,
         'nervegram_dur': nervegram_dur,
-        'spont_list': np.array(spont_list).astype(np.float32),
+        'cf_list': np.array(cf_list).astype(np.float32),
+        'bandwidth_scale_factor': np.array(bandwidth_scale_factor).astype(np.float32),
+        'species': species,
+        'spont': spont,
         'buffer_start_dur': buffer_start_dur,
         'buffer_end_dur': buffer_end_dur,
         'pin_dBSPL_flag': pin_dBSPL_flag,
         'pin_dBSPL': pin_dBSPL,
-        'species': species,
-        'bandwidth_scale_factor': bandwidth_scale_factor,
         'cohc': cohc,
         'cihc': cihc,
         'IhcLowPass_cutoff': IhcLowPass_cutoff,
