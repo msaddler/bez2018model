@@ -188,21 +188,21 @@ def nervegram(signal,
               pin_dBSPL=None,
               species=2,
               bandwidth_scale_factor=1.0,
-              cohc=1.0,
-              cihc=1.0,
-              IhcLowPass_cutoff=3e3,
-              IhcLowPass_order=7,
-              noiseType=1,
-              implnt=0,
-              tabs=6e-4,
-              trel=6e-4,
-              spont=70.0,
               cf_list=None,
               num_cf=50,
               min_cf=125.0,
               max_cf=8e3,
               max_spikes_per_train=-1,
               num_spike_trains=40,
+              cohc=1.0,
+              cihc=1.0,
+              IhcLowPass_cutoff=3e3,
+              IhcLowPass_order=7,
+              spont=70.0,
+              noiseType=1,
+              implnt=0,
+              tabs=6e-4,
+              trel=6e-4,
               random_seed=None,
               return_vihcs=True,
               return_meanrates=True,
@@ -304,36 +304,40 @@ def nervegram(signal,
 
     # ====== APPLY MANIPULATIONS ====== #
     if nervegram_dur is not None:
+        # Compute clip segment start and end indices
         buffer_start_idx = int(buffer_start_dur*nervegram_fs)
         buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
         clip_start_nervegram = np.random.randint(buffer_start_idx,
                                                  high=buffer_end_idx-nervegram_dur*nervegram_fs)
         clip_end_nervegram = clip_start_nervegram + int(nervegram_dur*nervegram_fs)
         assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
-        
-        # Clip analogous segment of signal (input stimulus)
+        # Clip segment of signal (input stimulus)
         clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
         clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
         signal = signal[clip_start_signal:clip_end_signal]
-        
-        # Clip analogous segment of pin (stimulus provided to ANmodel)
+        # Clip segment of pin (stimulus provided to ANmodel)
         clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
         clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
         pin = pin[clip_start_pin:clip_end_pin]
-        
         # Clip segment of vihcs (inner hair cell potential)
         if return_vihcs:
             nervegram_vihcs = nervegram_vihcs[:, clip_start_nervegram:clip_end_nervegram]
         # Clip segment of meanrates (instantaneous firing rate)
         if return_meanrates:
             nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
-        # Adjust spike times
+        # Adjust spike times (set t=0 to `clip_start_nervegram` and eliminate negative times)
         if return_spike_times:
             clip_start_nervegram_time = clip_start_nervegram / nervegram_fs
             clip_end_nervegram_time = clip_end_nervegram / nervegram_fs
             nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
             nervegram_spike_times = nervegram_spike_times - clip_start_nervegram_time
             nervegram_spike_times[nervegram_spike_times < 0] = 0
+            for itr0 in range(nervegram_spike_times.shape[0]):
+                for itr1 in range(nervegram_spike_times.shape[1]):
+                    spike_times = nervegram_spike_times[itr0, itr1, :]
+                    spike_times = spike_times[spike_times > 0]
+                    nervegram_spike_times[itr0, itr1, :] = 0
+                    nervegram_spike_times[itr0, itr1, 0:spike_times.shape[0]] = spike_times
 
     # ====== ORGANIZE output_dict ====== #
     output_dict = {
