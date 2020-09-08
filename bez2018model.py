@@ -35,7 +35,7 @@ def nervegram_meanrates(signal,
     
     Args
     ----
-    signal (np array): input pressure waveform must be 1-dimensional array (units Pa)
+    signal (np.ndarray): input pressure waveform must be 1-dimensional array (units Pa)
     signal_fs (int): sampling rate of signal (Hz)
     meanrates_params (dict): parameters for formatting output nervegram
     ANmodel_params (dict): parameters for running BEZ2018 ANmodel
@@ -213,10 +213,41 @@ def nervegram(signal,
 
     Args
     ----
+    signal (np.ndarray): input pressure waveform must be 1-dimensional array (units Pa)
+    signal_fs (int): sampling rate of input signal (Hz)
+    nervegram_dur (float or None): if not None, specifies duration of clipped nervegram
+    nervegram_fs (int): sampling rate of nervegram (Hz)
+    buffer_start_dur (float): period to ignore at start of nervegram (s)
+    buffer_end_dur (float): period to ignore at end of nervegram (s)
+    pin_fs (int): sampling rate of input signal passed to ANmodel (100000 Hz)
+    pin_dBSPL_flag (int): if 1, pin will be re-scaled to specified sound pressure level
+    pin_dBSPL (float): sound pressure level of input signal passed to ANmodel (dB SPL)
+    species (int): 1=cat, 2=human (Shera et al. 2002), 3=human (G&M 1990), 4=custom
+    bandwidth_scale_factor (float or list): cochlear filter bandwidth scaling factor
+    cf_list (None or list): if not None, specifies list of characteristic frequencies
+    num_cf (int): if cf_list is None, specifies number of ERB-spaced CFs
+    min_cf (float): if cf_list is None, specifies minimum CF (Hz)
+    max_cf (float): if cf_list is None, specifies maximum CF (Hz)
+    max_spikes_per_train (int): max array size for spike times output (<0 to auto-select)
+    num_spike_trains (int): number of spike trains to sample from spike generator
+    cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
+    cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    IhcLowPass_cutoff (float): cutoff frequency for IHC lowpass filter (Hz)
+    IhcLowPass_order (int): order for IHC lowpass filter
+    spont (float): spontaneous firing rate in spikes per second
+    noiseType (int): set to 0 for noiseless and 1 for variable fGn
+    implnt (int): set to 0 for "approx" and 1 for "actual" power-law function implementation
+    tabs (float): absolute refractory period in seconds
+    trel (float): baseline mean relative refractory period in seconds
+    random_seed (int or None): if not None, used to specify np.random.seed
+    return_vihcs (bool): if True, output_dict will contain inner hair cell potentials
+    return_meanrates (bool): if True, output_dict will contain instantaneous firing rates
+    return_spike_times (bool): if True, output_dict will contain spike times
+    return_spike_tensor (bool): if True, output_dict will contain binary spike tensor
 
     Returns
     -------
-    output_dict (dict): contains nervegram, stimulus, and all parameters
+    output_dict (dict): contains nervegram(s), stimulus, and all parameters
     '''
     # ============ PARSE ARGUMENTS ============ #
     # If specified, set random seed (eliminates stochasticity in ANmodel noise)
@@ -342,7 +373,7 @@ def nervegram(signal,
                     spike_times = spike_times[spike_times > 0]
                     nervegram_spike_times[itr0, itr1, :] = 0
                     nervegram_spike_times[itr0, itr1, 0:spike_times.shape[0]] = spike_times
-    # Generate binary tensor of spikes (with shape [spiketrain, CF, time]) from spike times
+    # Generate binary tensor of spikes (with shape [spike_train, CF, time]) from spike times
     if return_spike_tensor:
         assert return_spike_times, "`return_spike_times` must be true to generate spike tensor"
         nervegram_spike_indices = (nervegram_spike_times * nervegram_fs).astype(int)

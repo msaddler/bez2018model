@@ -111,7 +111,7 @@ def run_ihc(np.ndarray[np.float64_t, ndim=1] signal,
     signal (np.float64 array): input acoustic waveform in units of Pa
     fs (float): sampling rate in Hz
     cf (float): characteristic frequency in Hz
-    species (int): sets filter parameters: 1=cat, 2=human, 3=G&M1990
+    species (int): sets filter parameters: 1=cat, 2=human, 3=G&M1990, 4=custom
     bandwidth_scale_factor (float): scales cochlear filter bandwidth
     cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
