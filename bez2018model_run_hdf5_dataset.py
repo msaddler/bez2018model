@@ -141,7 +141,12 @@ def check_continuation(hdf5_filename,
 
 def get_default_data_key_pair_list(data_dict,
                                    hdf5_key_prefix='',
-                                   data_keys=['meanrates', 'signal', 'pin_dBSPL']):
+                                   data_keys=['signal',
+                                              'pin_dBSPL',
+                                              'nervegram_vihcs',
+                                              'nervegram_meanrates',
+                                              'nervegram_spike_times',
+                                              'nervegram_spike_tensor']):
     '''
     Helper function to get default data_key_pair_list from data_dict.
 
@@ -164,7 +169,12 @@ def get_default_data_key_pair_list(data_dict,
 
 def get_default_config_key_pair_list(data_dict,
                                      hdf5_key_prefix='config_bez2018model/',
-                                     ignore_keys=['meanrates', 'signal', 'pin', 'pin_dBSPL'],
+                                     ignore_keys=['signal',
+                                                  'pin_dBSPL',
+                                                  'nervegram_vihcs',
+                                                  'nervegram_meanrates',
+                                                  'nervegram_spike_times',
+                                                  'nervegram_spike_tensor'],
                                      flat_keyparts=['_fs', '_list']):
     '''
     Helper function to get default config_key_pair_list.
@@ -190,18 +200,18 @@ def get_default_config_key_pair_list(data_dict,
     return config_key_pair_list
 
 
-def generate_nervegram_meanrates(hdf5_filename,
-                                 list_signal,
-                                 signal_fs,
-                                 list_snr=None,
-                                 list_noise=None,
-                                 list_dbspl=None,
-                                 disp_step=10,
-                                 data_key_pair_list=[],
-                                 config_key_pair_list=[],
-                                 kwargs_nervegram_meanrates={},
-                                 kwargs_check_continuation={},
-                                 kwargs_initialization={}):
+def generate_nervegrams(hdf5_filename,
+                        list_signal,
+                        signal_fs,
+                        list_snr=None,
+                        list_noise=None,
+                        list_dbspl=None,
+                        disp_step=10,
+                        data_key_pair_list=[],
+                        config_key_pair_list=[],
+                        kwargs_nervegram={},
+                        kwargs_check_continuation={},
+                        kwargs_initialization={}):
     '''
     Main routine for generating BEZ2018 ANmodel nervegrams and writing outputs to hdf5 file.
 
@@ -216,15 +226,15 @@ def generate_nervegram_meanrates(hdf5_filename,
     disp_step (int): every disp_step, progress is displayed and hdf5 file is checkpointed
     data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
     config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
-    kwargs_nervegram_meanrates (dict or list of dicts): kwargs for `bez2018model.nervegram_meanrates()`
+    kwargs_nervegram (dict or list of dicts): kwargs for `bez2018model.nervegram()`
     kwargs_check_continuation (dict): kwargs for `check_continuation()`
     kwargs_initialization (dict): kwargs for `initialize_hdf5_file()`
     '''
-    # Calculate total number of signals and convert kwargs_nervegram_meanrates to list if needed
+    # Calculate total number of signals and convert kwargs_nervegram to list if needed
     N = list_signal.shape[0]
-    if not isinstance(kwargs_nervegram_meanrates, list):
-        kwargs_nervegram_meanrates = [kwargs_nervegram_meanrates] * N
-    assert len(kwargs_nervegram_meanrates) == N, "nervegram parameter list must have length N"
+    if not isinstance(kwargs_nervegram, list):
+        kwargs_nervegram = [kwargs_nervegram] * N
+    assert len(kwargs_nervegram) == N, "nervegram parameter list must have length N"
     if list_snr is not None:
         assert len(list_snr) == N, "list_snr must have length N"
         assert list_noise is not None, "list_noise must be specified if list_snr is specified"
@@ -263,19 +273,16 @@ def generate_nervegram_meanrates(hdf5_filename,
                 rms_noise = np.sqrt(np.mean(np.square(noise)))
                 rms_noise_scaling = rms_signal / (rms_noise * np.power(10, snr / 20))
                 signal = signal + rms_noise_scaling * noise
-        # Update stimulus sound presentation level settings in kwargs_nervegram_meanrates
-        kwargs_nm = kwargs_nervegram_meanrates[idx]
+        # Update stimulus sound presentation level settings in kwargs_nervegram
         if list_dbspl is not None:
-            kwargs_nm_update = {
-                'ANmodel_params': {
-                    'pin_dBSPL_flag': 1,
-                    'pin_dBSPL': list_dbspl[idx]
-                }
+            kwargs_update = {
+                'pin_dBSPL_flag': 1,
+                'pin_dBSPL': list_dbspl[idx],
             }
-            kwargs_nm = recursive_dict_merge(kwargs_nm, kwargs_nm_update)
+            kwargs_nervegram[idx] = recursive_dict_merge(kwargs_nervegram[idx], kwargs_update)
 
         # Run stimulus through ANmodel and generate meanrates nervegram
-        data_dict = bez2018model.nervegram_meanrates(signal, signal_fs, **kwargs_nm)
+        data_dict = bez2018model.nervegram(signal, signal_fs, **kwargs_nervegram[idx])
 
         # If key pair lists are empty, get reasonable defaults
         if len(data_key_pair_list) == 0:
@@ -297,6 +304,10 @@ def generate_nervegram_meanrates(hdf5_filename,
                                  **kwargs_initialization)
             continuation_flag = True
             hdf5_f = h5py.File(hdf5_filename, 'r+')
+            for (k, _) in data_key_pair_list:
+                print('>>> [DATA] {}'.format(k), hdf5_f[k])
+            for (k, _) in config_key_pair_list:
+                print('>>> [CONFIG] {}'.format(k), hdf5_f[k])
 
         # Write the ANmodel outputs to the hdf5 dataset
         write_example_to_hdf5(hdf5_f,
@@ -348,7 +359,7 @@ def run_dataset_generation(source_hdf5_filename,
     source_key_dbspl (str): key for stimulus dB SPL dataset in source_hdf5_filename
     source_keys_to_copy (list): keys for datasets in source_hdf5_filename to copy to dest_hdf5_filename
     range_dbspl (list): min and max sound presentation level (only used if source_key_dbspl is None)
-    **kwargs (passed directly to `generate_nervegram_meanrates()`)
+    **kwargs (passed directly to `generate_nervegrams()`)
     '''
     # Ensure source and destination filenames are different and open the source hdf5 file
     assert not source_hdf5_filename == dest_hdf5_filename, "source and dest hdf5 files must be different"
@@ -381,13 +392,13 @@ def run_dataset_generation(source_hdf5_filename,
 
     # Run the main ANmodel nervegram generation routine
     print('>>> [START] {}'.format(dest_hdf5_filename))
-    generate_nervegram_meanrates(dest_hdf5_filename,
-                                 list_signal,
-                                 signal_fs,
-                                 list_snr=list_snr,
-                                 list_noise=list_noise,
-                                 list_dbspl=list_dbspl,
-                                 **kwargs)
+    generate_nervegrams(dest_hdf5_filename,
+                        list_signal,
+                        signal_fs,
+                        list_snr=list_snr,
+                        list_noise=list_noise,
+                        list_dbspl=list_dbspl,
+                        **kwargs)
 
     # Copy specified datasets from source hdf5 file to destination hdf5 file
     dsets_to_copy = {}
@@ -423,7 +434,7 @@ def parallel_run_dataset_generation(source_regex,
     job_idx (int): index of current job
     jobs_per_source_file (int): number of jobs each source file is split into
     source_key_signal (str): key for signal dataset in source_hdf5_filename
-    **kwargs (passed directly to `generate_nervegram_meanrates()`)
+    **kwargs (passed directly to `generate_nervegrams()`)
     '''
     # Determine the source_hdf5_filename using source_regex, job_idx, and jobs_per_source_file
     source_fn_list = sorted(glob.glob(source_regex))
