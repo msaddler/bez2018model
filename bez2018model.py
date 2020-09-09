@@ -341,8 +341,11 @@ def nervegram(signal,
         # Compute clip segment start and end indices
         buffer_start_idx = int(buffer_start_dur*nervegram_fs)
         buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
-        clip_start_nervegram = np.random.randint(buffer_start_idx,
-                                                 high=buffer_end_idx-nervegram_dur*nervegram_fs)
+        if buffer_start_idx == buffer_end_idx - nervegram_dur*nervegram_fs:
+            clip_start_nervegram = buffer_start_idx
+        else:
+            clip_start_nervegram = np.random.randint(buffer_start_idx,
+                                                     high=buffer_end_idx-nervegram_dur*nervegram_fs)
         clip_end_nervegram = clip_start_nervegram + int(nervegram_dur*nervegram_fs)
         assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
         # Clip segment of signal (input stimulus)
