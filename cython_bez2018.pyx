@@ -317,10 +317,13 @@ def run_anf(
     
     # Initialize `sptime` output array with length equal to `max_spikes_per_train`
     total_mean_rate = np.sum(synout) / I # calculate the overall mean synaptic rate
+    MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
+    SignalLength = totalstim * nrep * tdres
+    est_max_spikes_per_train = int(np.ceil(SignalLength / MeanISI + 3 * np.sqrt(SignalLength/MeanISI)))
     if max_spikes_per_train < 0:
-        MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
-        SignalLength = totalstim * nrep * tdres
-        max_spikes_per_train = int(np.ceil(SignalLength / MeanISI + 3 * np.sqrt(SignalLength/MeanISI)))
+        max_spikes_per_train = est_max_spikes_per_train
+    if est_max_spikes_per_train > max_spikes_per_train:
+        raise ValueError("max_spikes_per_train must be at least {}".format(est_max_spikes_per_train))
     sptime = np.zeros([max_spikes_per_train], dtype=vihc.dtype)
     cdef double *sptime_data = <double *>np.PyArray_DATA(sptime)
     
@@ -351,7 +354,8 @@ def run_anf(
             sptime_data,
             trd_vector_data)
         spike_times[itr_n] = sptime
-        
+        if nspikes < 0:
+            raise ValueError("`run_anf` failed due to insufficient max_spikes_per_train")
         if itr_n == 0:
             # Estimate instantaneous mean firing rate on first iteration
             IDX = synout > 0
@@ -361,7 +365,7 @@ def run_anf(
             trel_vector[trel_vector > trel] = trel
             meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
     
-    return {'synout':synout, 'meanrate': meanrate, 'spike_times':spike_times,}
+    return {'synout':synout, 'meanrate':meanrate, 'spike_times':spike_times,}
 
 
 cdef public double* generate_random_numbers(long length):
