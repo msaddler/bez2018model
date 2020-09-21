@@ -2,7 +2,7 @@ import numpy as np
 import util_bez2018
 import scipy.signal
 
-from libc.stdlib cimport malloc
+from libc.stdlib cimport malloc, free
 cimport numpy as np
 np.import_array()
 
@@ -315,7 +315,7 @@ def run_anf(
         sampFreq,
         synout_data)
     
-    # Initialize `sptime` output array with length equal to `max_spikes_per_train`
+    # Allocate `sptime_data` C-array with length equal to `max_spikes_per_train`
     total_mean_rate = np.sum(synout) / I # calculate the overall mean synaptic rate
     MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
     SignalLength = totalstim * nrep * tdres
@@ -324,18 +324,20 @@ def run_anf(
         max_spikes_per_train = est_max_spikes_per_train
     if est_max_spikes_per_train > max_spikes_per_train:
         raise ValueError("max_spikes_per_train must be at least {}".format(est_max_spikes_per_train))
-    sptime = np.zeros([max_spikes_per_train], dtype=vihc.dtype)
-    cdef double *sptime_data = <double *>np.PyArray_DATA(sptime)
+    cdef double *sptime_data = <double *>malloc(max_spikes_per_train*sizeof(double))
     
-    # Initialize `trd_vector` output array and data pointer
-    trd_vector = np.zeros_like(vihc) # mean synaptic redocking times
-    cdef double *trd_vector_data = <double *>np.PyArray_DATA(trd_vector)
+    # Allocate `trd_vector_data` C-array with same length as `vihc`
+    cdef double *trd_vector_data = <double *>malloc(len(vihc)*sizeof(double))
     
     # Call the SpikeGenerator function once for each spike train
     spike_times = np.zeros([num_spike_trains, max_spikes_per_train], dtype=vihc.dtype)
     for itr_n in range(num_spike_trains):
-        sptime[:] = 0 # reset sptime for each call to SpikeGenerator
-        trd_vector[:] = 0 # reset trd_vector for each call to SpikeGenerator
+        # Reset sptime_data for each call to SpikeGenerator
+        for itr_c in range(max_spikes_per_train):
+            sptime_data[itr_c] = 0
+        # Reset trd_vector_data for each call to SpikeGenerator
+        for itr_c in range(len(vihc)):
+            trd_vector_data[itr_c] = 0
         nspikes = SpikeGenerator(
             synout_data,
             tdres,
@@ -353,9 +355,11 @@ def run_anf(
             max_spikes_per_train,
             sptime_data,
             trd_vector_data)
-        spike_times[itr_n] = sptime
         if nspikes < 0:
             raise ValueError("`run_anf` failed due to insufficient max_spikes_per_train")
+        # Convert C-arrays to np.ndarrays
+        spike_times[itr_n] = [t for t in sptime_data[:max_spikes_per_train]]
+        trd_vector = np.array([t for t in trd_vector_data[:len(vihc)]])
         if itr_n == 0:
             # Estimate instantaneous mean firing rate on first iteration
             IDX = synout > 0
@@ -364,7 +368,8 @@ def run_anf(
             trel_vector[IDX] = trel * 100 / synout[IDX]
             trel_vector[trel_vector > trel] = trel
             meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
-    
+    free(sptime_data)
+    free(trd_vector_data)
     return {'synout':synout, 'meanrate':meanrate, 'spike_times':spike_times,}
 
 
