@@ -255,13 +255,14 @@ def run_anf(
         double spont=70.,
         double tabs=0.6e-3,
         double trel=0.6e-3,
+        double synapseMode=0.,
         int max_spikes_per_train=-1,
         int num_spike_trains=1):
     """
     Run IHC-ANF synapse model and spike generator. Additional arguments
     allow for efficient sampling of multiple ANF spike trains.
     (based on https://github.com/mrkrd/cochlea/blob/master/cochlea/zilany2014)
-    
+
     Args
     ----
     vihc (np.float64 array): IHC membrane potential (in volts)
@@ -272,9 +273,10 @@ def run_anf(
     spont (float): spontaneous firing rate in spikes per second
     tabs (float): absolute refractory period in seconds
     trel (float): baseline mean relative refractory period in seconds
+    synapseMode (float): set to 1 to re-run synapse model for each spike train (0 to re-use synout)
     max_spikes_per_train (int): max array size for spike times output (<0 to auto-select)
     num_spike_trains (int): number of spike trains to sample from spike generator
-    
+
     Returns
     -------
     output_dict (dict): dictionary of all output variables (np.float64 arrays)
@@ -286,7 +288,7 @@ def run_anf(
     if not vihc.flags['C_CONTIGUOUS']:
         vihc = vihc.copy(order='C')
     cdef double *vihc_data = <double *>np.PyArray_DATA(vihc)
-    
+
     # Fixed parameters for Synapse and SpikeGenerator functions
     tdres = 1/fs
     totalstim = len(vihc)
@@ -297,11 +299,11 @@ def run_anf(
     t_rd_jump = 0.4e-3 # size of jump in mean redocking time when a redocking event occurs
     t_rd_init = t_rd_rest + 0.02e-3 * spont - t_rd_jump # initial value of the mean redocking time
     tau = 60.0e-3 # time constant for short-term adaptation (in mean redocking time)
-    
+
     # Initialize `synout` array and data pointer
     synout = np.zeros_like(vihc) # spiking probabilities
     cdef double *synout_data = <double *>np.PyArray_DATA(synout)
-    
+
     # Call the Synapse function
     I = Synapse(
         vihc_data,
@@ -314,7 +316,7 @@ def run_anf(
         implnt,
         sampFreq,
         synout_data)
-    
+
     # Allocate `sptime_data` C-array with length equal to `max_spikes_per_train`
     total_mean_rate = np.sum(synout) / I # calculate the overall mean synaptic rate
     MeanISI = (1 / total_mean_rate) + (t_rd_init) / nSites + tabs + trel
@@ -325,13 +327,27 @@ def run_anf(
     if est_max_spikes_per_train > max_spikes_per_train:
         raise ValueError("max_spikes_per_train must be at least {}".format(est_max_spikes_per_train))
     cdef double *sptime_data = <double *>malloc(max_spikes_per_train*sizeof(double))
-    
+
     # Allocate `trd_vector_data` C-array with same length as `vihc`
     cdef double *trd_vector_data = <double *>malloc(len(vihc)*sizeof(double))
-    
+
     # Call the SpikeGenerator function once for each spike train
     spike_times = np.zeros([num_spike_trains, max_spikes_per_train], dtype=vihc.dtype)
     for itr_n in range(num_spike_trains):
+        # If synapseMode is 1, re-run the synapse model for each new spike train
+        if (synapseMode == 1) and (itr_n > 0):
+            I = Synapse(
+                vihc_data,
+                tdres,
+                cf,
+                totalstim,
+                nrep,
+                spont,
+                noiseType,
+                implnt,
+                sampFreq,
+                synout_data)
+
         # Reset sptime_data for each call to SpikeGenerator
         for itr_c in range(max_spikes_per_train):
             sptime_data[itr_c] = 0
@@ -370,7 +386,7 @@ def run_anf(
             meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
     free(sptime_data)
     free(trd_vector_data)
-    return {'synout':synout, 'meanrate':meanrate, 'spike_times':spike_times,}
+    return {'meanrate':meanrate, 'spike_times':spike_times}
 
 
 cdef public double* generate_random_numbers(long length):
