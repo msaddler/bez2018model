@@ -572,5 +572,6 @@ int SpikeGenerator(double *synout,
     free(current_release_times);
     free(oneSiteRedock);
     free(Xsum);
+    free(randNums);
     return (spCount);
 } /* End of the SpikeGenerator function */

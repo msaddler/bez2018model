@@ -303,16 +303,22 @@ double Get_tauwb(double cf, int species, double bandwidth_scale_factor, int orde
     if (species==1) /* cat Q10 values */
     {
         Q10 = pow(10,0.4708*log10(cf/1e3)+0.4664);
+        bw = bandwidth_scale_factor*(cf/Q10);
     }
     if (species==2) /* human Q10 values from Shera et al. (PNAS 2002) */
     {
         Q10 = pow((cf/1000),0.3)*12.7*0.505+0.2085;
+        bw = bandwidth_scale_factor*(cf/Q10);
     }
     if (species==3) /* human Q10 values from Glasberg & Moore (Hear. Res. 1990) */
     {
         Q10 = cf/24.7/(4.37*(cf/1000)+1)*0.505+0.2085;
+        bw = bandwidth_scale_factor*(cf/Q10);
     }
-    bw = bandwidth_scale_factor*(cf/Q10);
+    if (species==4) /* set bandwidth to bandwidth_scale_factor (msaddler 2020-08-29) */
+    {
+        bw = bandwidth_scale_factor;
+    }
     taumax[0] = 2.0/(TWOPI*bw);
     taumin[0] = taumax[0]*ratio;
     return 0;
