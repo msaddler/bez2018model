@@ -7,7 +7,11 @@ import glob
 import time
 import copy
 import collections
-import dask.array
+try:
+    import dask.array
+except ImportError as e:
+    print(e)
+    pass
 
 
 def recursive_dict_merge(dict1, dict2):
@@ -49,7 +53,7 @@ def initialize_hdf5_file(hdf5_filename,
                          data_key_pair_list=[],
                          config_key_pair_list=[],
                          dtype=np.float32,
-                         cast_data=True,
+                         cast_data=False,
                          cast_config=False,
                          compression=None,
                          compression_opts=None):
@@ -82,10 +86,15 @@ def initialize_hdf5_file(hdf5_filename,
         data_key_value = np.squeeze(np.array(data_dict[data_key]))
         if cast_data:
             data_key_value = data_key_value.astype(dtype)
-        data_key_shape = [N] + list(data_key_value.shape)
+        if 'vlen' in hdf5_key:
+            data_key_dtype = h5py.special_dtype(vlen=data_key_value.dtype)
+            data_key_shape = [N] + list(data_key_value.shape)[:-1]
+        else:
+            data_key_dtype = data_key_value.dtype
+            data_key_shape = [N] + list(data_key_value.shape)
         f.create_dataset(hdf5_key,
                          data_key_shape,
-                         dtype=data_key_value.dtype,
+                         dtype=data_key_dtype,
                          **kwargs_create_dataset)
     # Create and populate the config datasets
     for (hdf5_key, config_key) in config_key_pair_list:
