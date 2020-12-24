@@ -78,7 +78,9 @@ def nervegram(signal,
               return_vihcs=True,
               return_meanrates=True,
               return_spike_times=True,
-              return_spike_tensor=True):
+              return_spike_tensor_sparse=True,
+              return_spike_tensor_dense=False,
+              nervegram_spike_tensor_fs=100e3):
     '''
     Main function for generating an auditory nervegram.
 
@@ -115,7 +117,9 @@ def nervegram(signal,
     return_vihcs (bool): if True, output_dict will contain inner hair cell potentials
     return_meanrates (bool): if True, output_dict will contain instantaneous firing rates
     return_spike_times (bool): if True, output_dict will contain spike times
-    return_spike_tensor (bool): if True, output_dict will contain binary spike tensor
+    return_spike_tensor_sparse (bool): if True, output_dict will contain sparse binary spike tensor
+    return_spike_tensor_dense (bool): if True, output_dict will contain dense binary spike tensor
+    nervegram_spike_tensor_fs (int): sampling rate of nervegram binary spike tensor (Hz)
 
     Returns
     -------
@@ -161,7 +165,7 @@ def nervegram(signal,
         nervegram_vihcs = []
     if return_meanrates:
         nervegram_meanrates = []
-    if return_spike_times or return_spike_tensor:
+    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
         nervegram_spike_times = []
 
     # Iterate over all CFs and run the auditory nerve model components
@@ -195,7 +199,7 @@ def nervegram(signal,
             tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
             tmp_meanrate[tmp_meanrate < 0] = 0
             nervegram_meanrates.append(tmp_meanrate)
-        if return_spike_times or return_spike_tensor:
+        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
             tmp_spike_times = synapse_out['spike_times']
             nervegram_spike_times.append(tmp_spike_times)
 
@@ -204,7 +208,7 @@ def nervegram(signal,
         nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
     if return_meanrates:
         nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
-    if return_spike_times or return_spike_tensor:
+    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
         nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
 
     # ============ APPLY TRANSFORMATIONS ============ #
@@ -236,7 +240,7 @@ def nervegram(signal,
         if return_meanrates:
             nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
         # Adjust spike times (set t=0 to `clip_start_nervegram` and eliminate negative times)
-        if return_spike_times or return_spike_tensor:
+        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_sparse]):
             clip_start_nervegram_time = clip_start_nervegram / nervegram_fs
             clip_end_nervegram_time = clip_end_nervegram / nervegram_fs
             nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
@@ -250,17 +254,23 @@ def nervegram(signal,
                     nervegram_spike_times[itr0, itr1, :] = 0
                     nervegram_spike_times[itr0, itr1, 0:spike_times.shape[0]] = spike_times
     # Generate sparse representation of binary spike tensor from spike times
-    if return_spike_tensor:
-        nervegram_spike_indices = (nervegram_spike_times * nervegram_fs).astype(int)
+    if any([return_spike_tensor_sparse, return_spike_tensor_dense]):
+        if nervegram_spike_tensor_fs is None:
+            nervegram_spike_tensor_fs = nervegram_fs
+        # Bin spike times with sampling rate `nervegram_spike_tensor_fs`
+        nervegram_spike_indices = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
         # Binary spike tensor has dense shape [spike_train, CF, time]
-        dense_shape = np.array(list(nervegram_spike_indices.shape)[:-1] + [int(nervegram_dur*nervegram_fs)])
-        nervegram_spike_tensor = []
+        spike_tensor_time_dim = int(nervegram_dur*nervegram_spike_tensor_fs)
+        dense_shape = np.array(list(nervegram_spike_indices.shape)[:-1] + [spike_tensor_time_dim])
+        nervegram_spike_tensor_sparse = []
         for itr0 in range(nervegram_spike_indices.shape[0]):
             for itr1 in range(nervegram_spike_indices.shape[1]):
                 for itr2 in np.trim_zeros(nervegram_spike_indices[itr0, itr1], trim='b'):
-                    nervegram_spike_tensor.append([itr0, itr1, itr2])
-        nervegram_spike_tensor_dtype = get_sparse_index_min_dtype(dense_shape)
-        nervegram_spike_tensor = np.stack(nervegram_spike_tensor, axis=1).astype(nervegram_spike_tensor_dtype)
+                    nervegram_spike_tensor_sparse.append([itr0, itr1, itr2])
+        index_dtype = get_sparse_index_min_dtype(dense_shape)
+        nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1).astype(index_dtype)
+        if return_spike_tensor_dense:
+            raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
 
     # ============ RETURN OUTPUT AS DICTIONARY ============ #
     output_dict = {
@@ -270,6 +280,7 @@ def nervegram(signal,
         'pin_fs': pin_fs,
         'nervegram_fs': nervegram_fs,
         'nervegram_dur': nervegram_dur,
+        'nervegram_spike_tensor_fs': nervegram_spike_tensor_fs,
         'cf_list': np.array(cf_list).astype(np.float32),
         'bandwidth_scale_factor': np.array(bandwidth_scale_factor).astype(np.float32),
         'species': species,
@@ -296,7 +307,9 @@ def nervegram(signal,
         output_dict['nervegram_meanrates'] = nervegram_meanrates
     if return_spike_times:
         output_dict['nervegram_spike_times'] = nervegram_spike_times
-    if return_spike_tensor:
+    if return_spike_tensor_sparse:
         output_dict['nervegram_spike_tensor_shape'] = dense_shape
-        output_dict['nervegram_spike_tensor'] = nervegram_spike_tensor
+        output_dict['nervegram_spike_tensor_sparse'] = nervegram_spike_tensor_sparse
+    if return_spike_tensor_dense:
+        raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
     return output_dict
