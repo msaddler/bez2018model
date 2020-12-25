@@ -27,7 +27,7 @@ def get_ERB_cf_list(num_cf, min_cf=125.0, max_cf=8e3):
     return list(cf_list)
 
 
-def get_sparse_index_min_dtype(shape):
+def get_min_idx_dtype(shape):
     '''
     Helper function returns minimum numpy integer dataype for converting an array
     with specified `shape` to a sparse array (list of integers).
@@ -215,7 +215,7 @@ def nervegram(signal,
     if (nervegram_dur is None) or (nervegram_dur == signal_dur):
         nervegram_dur = signal_dur
     else:
-        # Compute clip segment start and end indices
+        # Compute clip segment start and end indexes
         buffer_start_idx = int(buffer_start_dur*nervegram_fs)
         buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
         if buffer_start_idx == buffer_end_idx - nervegram_dur*nervegram_fs:
@@ -258,17 +258,16 @@ def nervegram(signal,
         if nervegram_spike_tensor_fs is None:
             nervegram_spike_tensor_fs = nervegram_fs
         # Bin spike times with sampling rate `nervegram_spike_tensor_fs`
-        nervegram_spike_indices = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
+        nervegram_spike_idx = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
         # Binary spike tensor has dense shape [spike_train, CF, time]
         spike_tensor_time_dim = int(nervegram_dur*nervegram_spike_tensor_fs)
-        dense_shape = np.array(list(nervegram_spike_indices.shape)[:-1] + [spike_tensor_time_dim])
+        dense_shape = np.array(list(nervegram_spike_idx.shape)[:-1] + [spike_tensor_time_dim])
         nervegram_spike_tensor_sparse = []
-        for itr0 in range(nervegram_spike_indices.shape[0]):
-            for itr1 in range(nervegram_spike_indices.shape[1]):
-                for itr2 in np.trim_zeros(nervegram_spike_indices[itr0, itr1], trim='b'):
+        for itr0 in range(nervegram_spike_idx.shape[0]):
+            for itr1 in range(nervegram_spike_idx.shape[1]):
+                for itr2 in np.trim_zeros(nervegram_spike_idx[itr0, itr1], trim='b'):
                     nervegram_spike_tensor_sparse.append([itr0, itr1, itr2])
-        index_dtype = get_sparse_index_min_dtype(dense_shape)
-        nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1).astype(index_dtype)
+        nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1)
         if return_spike_tensor_dense:
             raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
 
@@ -308,8 +307,10 @@ def nervegram(signal,
     if return_spike_times:
         output_dict['nervegram_spike_times'] = nervegram_spike_times
     if return_spike_tensor_sparse:
-        output_dict['nervegram_spike_tensor_shape'] = dense_shape
-        output_dict['nervegram_spike_tensor_sparse'] = nervegram_spike_tensor_sparse
+        output_dict['nervegram_spike_tensor_dense_shape'] = dense_shape
+        for idx in range(nervegram_spike_tensor_sparse.shape[0]):
+            k = 'nervegram_spike_tensor_sparse{}'.format(idx)
+            output_dict[k] = nervegram_spike_tensor_sparse[idx].astype(get_min_idx_dtype(dense_shape[idx]))
     if return_spike_tensor_dense:
         raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
     return output_dict
