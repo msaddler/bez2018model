@@ -47,6 +47,40 @@ def get_min_idx_dtype(shape):
         raise ValueError("Requested shape too large to store indexes as integers")
 
 
+def sparse_to_dense_nervegram_spike_tensor(dense_shape,
+                                           index_arg,
+                                           index_keypart='nervegram_spike_tensor_sparse'):
+    '''
+    Helper function for converting sparse nervegram spike tensor to a dense
+    nervegram spike tensor.
+    
+    Args
+    ----
+    dense_shape (tuple): dimensions of `nervegram_spike_tensor_dense`
+    index_arg (dict or np.ndarray): sparse nervegram spike tensor (list of spike indexes).
+        If index_arg is a dictionary, function will use `index_keypart` to search for index
+        fields. Otherwise, index_arg must be an iterable with shape [ndims, N] (recommended).
+    index_keypart (str): string part for identifying index fields if index_arg is a dictionary.
+        Note that index fields must be correctly ordered by the `sorted` function.
+    
+    Returns
+    -------
+    nervegram_spike_tensor_dense (np.ndarray): dense binary spike tensor (dtype bool)
+    '''
+    nervegram_spike_tensor_dense = np.zeros(dense_shape, dtype=bool)
+    if isinstance(index_arg, dict):
+        INDEXABLE = []
+        for key in sorted(index_arg.keys()):
+            if index_keypart in key:
+                INDEXABLE.append(index_arg[key])
+        INDEXABLE = tuple(INDEXABLE)
+    else:
+        INDEXABLE = tuple(index_arg)
+    assert len(INDEXABLE) == len(dense_shape)
+    nervegram_spike_tensor_dense[INDEXABLE] = True
+    return nervegram_spike_tensor_dense
+
+
 def nervegram(signal,
               signal_fs,
               nervegram_dur=None,
@@ -269,7 +303,8 @@ def nervegram(signal,
                     nervegram_spike_tensor_sparse.append([itr0, itr1, itr2])
         nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1)
         if return_spike_tensor_dense:
-            raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
+            nervegram_spike_tensor_dense = sparse_to_dense_nervegram_spike_tensor(
+                dense_shape, nervegram_spike_tensor_sparse)
 
     # ============ RETURN OUTPUT AS DICTIONARY ============ #
     output_dict = {
@@ -312,5 +347,5 @@ def nervegram(signal,
             k = 'nervegram_spike_tensor_sparse{}'.format(idx)
             output_dict[k] = nervegram_spike_tensor_sparse[idx].astype(get_min_idx_dtype(dense_shape[idx]))
     if return_spike_tensor_dense:
-        raise NotImplementedError("sparse to dense nervegram spike tensor conversion is not yet implemented")
+        output_dict['nervegram_spike_tensor_dense'] = nervegram_spike_tensor_dense
     return output_dict

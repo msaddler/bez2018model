@@ -157,6 +157,7 @@ def get_default_data_key_pair_list(data_dict,
                                               'nervegram_meanrates',
                                               'nervegram_spike_times',
                                               'nervegram_spike_tensor',
+                                              'nervegram_spike_tensor_dense',
                                               'nervegram_spike_tensor_sparse*']):
     '''
     Helper function to get default data_key_pair_list from data_dict.
@@ -191,6 +192,7 @@ def get_default_config_key_pair_list(data_dict,
                                                   'nervegram_meanrates',
                                                   'nervegram_spike_times',
                                                   'nervegram_spike_tensor',
+                                                  'nervegram_spike_tensor_dense',
                                                   'nervegram_spike_tensor_sparse*'],
                                      flat_keyparts=['_fs', '_list', '_shape']):
     '''
