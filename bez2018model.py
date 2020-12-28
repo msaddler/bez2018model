@@ -138,8 +138,8 @@ def nervegram(signal,
     synapseMode (float): set to 1 to re-run synapse model for each spike train (0 to re-use synout)
     max_spikes_per_train (int): max array size for spike times output (<0 to auto-select)
     num_spike_trains (int): number of spike trains to sample from spike generator
-    cohc (float): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
-    cihc (float): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
+    cohc (float or list): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
+    cihc (float or list): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
     IhcLowPass_cutoff (float): cutoff frequency for IHC lowpass filter (Hz)
     IhcLowPass_order (int): order for IHC lowpass filter
     spont (float): spontaneous firing rate in spikes per second
@@ -175,7 +175,19 @@ def nervegram(signal,
     if len(bandwidth_scale_factor) == 1:
         bandwidth_scale_factor = len(cf_list) * bandwidth_scale_factor
     msg = "cf_list and bandwidth_scale_factor must have the same length"
-    assert len(bandwidth_scale_factor) == len(cf_list), msg
+    assert len(cf_list) == len(bandwidth_scale_factor), msg
+    # Convert `cohc` to list of same length as `cf_list` if needed
+    cohc = np.array(cohc).reshape([-1]).tolist()
+    if len(cohc) == 1:
+        cohc = len(cf_list) * cohc
+    msg = "cf_list and cohc must have the same length"
+    assert len(cf_list) == len(cohc), msg
+    # Convert `cihc` to list of same length as `cf_list` if needed
+    cihc = np.array(cihc).reshape([-1]).tolist()
+    if len(cihc) == 1:
+        cihc = len(cf_list) * cihc
+    msg = "cf_list and cihc must have the same length"
+    assert len(cf_list) == len(cihc), msg
 
     # ============ RESAMPLE AND RESCALE INPUT SIGNAL ============ #
     # Resample the input signal to pin_fs (at least 100kHz) for ANmodel
@@ -210,8 +222,8 @@ def nervegram(signal,
                                       cf,
                                       species=species,
                                       bandwidth_scale_factor=bandwidth_scale_factor[cf_idx],
-                                      cohc=cohc,
-                                      cihc=cihc,
+                                      cohc=cohc[cf_idx],
+                                      cihc=cihc[cf_idx],
                                       IhcLowPass_cutoff=IhcLowPass_cutoff,
                                       IhcLowPass_order=IhcLowPass_order)
         ###### Run IHC-ANF synapse model ######
