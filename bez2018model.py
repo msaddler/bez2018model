@@ -1,9 +1,6 @@
 import cython_bez2018 # Package must be installed in-place: `python setup.py build_ext --inplace`
 import numpy as np
 import scipy.signal
-import sys
-import pdb
-import time
 
 
 def get_ERB_cf_list(num_cf, min_cf=125.0, max_cf=8e3):
