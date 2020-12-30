@@ -4,10 +4,15 @@ import bez2018model
 import numpy as np
 import h5py
 import glob
+import re
 import time
 import copy
 import collections
-import dask.array
+try:
+    import dask.array
+except ImportError as e:
+    print(e)
+    pass
 
 
 def recursive_dict_merge(dict1, dict2):
@@ -49,7 +54,7 @@ def initialize_hdf5_file(hdf5_filename,
                          data_key_pair_list=[],
                          config_key_pair_list=[],
                          dtype=np.float32,
-                         cast_data=True,
+                         cast_data=False,
                          cast_config=False,
                          compression=None,
                          compression_opts=None):
@@ -82,10 +87,15 @@ def initialize_hdf5_file(hdf5_filename,
         data_key_value = np.squeeze(np.array(data_dict[data_key]))
         if cast_data:
             data_key_value = data_key_value.astype(dtype)
-        data_key_shape = [N] + list(data_key_value.shape)
+        if ('vlen' in hdf5_key) or ('sparse' in hdf5_key):
+            data_key_dtype = h5py.special_dtype(vlen=data_key_value.dtype)
+            data_key_shape = [N] + list(data_key_value.shape)[:-1]
+        else:
+            data_key_dtype = data_key_value.dtype
+            data_key_shape = [N] + list(data_key_value.shape)
         f.create_dataset(hdf5_key,
                          data_key_shape,
-                         dtype=data_key_value.dtype,
+                         dtype=data_key_dtype,
                          **kwargs_create_dataset)
     # Create and populate the config datasets
     for (hdf5_key, config_key) in config_key_pair_list:
@@ -146,7 +156,9 @@ def get_default_data_key_pair_list(data_dict,
                                               'nervegram_vihcs',
                                               'nervegram_meanrates',
                                               'nervegram_spike_times',
-                                              'nervegram_spike_tensor']):
+                                              'nervegram_spike_tensor',
+                                              'nervegram_spike_tensor_dense',
+                                              'nervegram_spike_tensor_sparse*']):
     '''
     Helper function to get default data_key_pair_list from data_dict.
 
@@ -161,21 +173,28 @@ def get_default_data_key_pair_list(data_dict,
     data_key_pair_list (list): list of tuples (hdf5_key, data_key) for datasets with N rows
     '''
     data_key_pair_list = []
-    for key in data_dict.keys():
+    for key in sorted(data_dict.keys()):
         if key in data_keys:
             data_key_pair_list.append((hdf5_key_prefix + key, key))
+        else:
+            for regex_key in [k for k in data_keys if '*' in k]:
+                if re.match(regex_key, key):
+                    data_key_pair_list.append((hdf5_key_prefix + key, key))
     return data_key_pair_list
 
 
 def get_default_config_key_pair_list(data_dict,
                                      hdf5_key_prefix='config_bez2018model/',
                                      ignore_keys=['signal',
+                                                  'pin',
                                                   'pin_dBSPL',
                                                   'nervegram_vihcs',
                                                   'nervegram_meanrates',
                                                   'nervegram_spike_times',
-                                                  'nervegram_spike_tensor'],
-                                     flat_keyparts=['_fs', '_list']):
+                                                  'nervegram_spike_tensor',
+                                                  'nervegram_spike_tensor_dense',
+                                                  'nervegram_spike_tensor_sparse*'],
+                                     flat_keyparts=['_fs', '_list', '_shape']):
     '''
     Helper function to get default config_key_pair_list.
 
@@ -191,8 +210,14 @@ def get_default_config_key_pair_list(data_dict,
     config_key_pair_list (list): list of tuples (hdf5_key, config_key) for config datasets
     '''
     config_key_pair_list = []
-    for key in data_dict.keys():
-        if not key in ignore_keys:
+    for key in sorted(data_dict.keys()):
+        is_config_key = True
+        if key in ignore_keys:
+            is_config_key = False
+        for regex_key in [k for k in ignore_keys if '*' in k]:
+            if re.match(regex_key, key):
+                is_config_key = False
+        if is_config_key:
             if any([keypart in key for keypart in flat_keyparts]):
                 config_key_pair_list.append((key, key))
             else:
