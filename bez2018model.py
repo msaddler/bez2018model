@@ -30,16 +30,18 @@ def get_min_idx_dtype(shape):
     with specified `shape` to a sparse array (list of integers).
     '''
     largest_dim = np.max(shape)
-    if largest_dim <= 255 + 1:
+    if largest_dim <= 127:
+        return np.int8
+    elif largest_dim <= 255:
         return np.uint8
-    elif largest_dim <= 65535 + 1:
+    elif largest_dim <= 32767:
+        return np.int16
+    elif largest_dim <= 65535:
         return np.uint16
-    elif largest_dim <= 4294967295 + 1:
-        return np.uint32
-    elif largest_dim <= 9223372036854775807 + 1:
+    elif largest_dim <= 2147483647:
+        return np.int32
+    elif largest_dim <= 9223372036854775807:
         return np.int64
-    elif largest_dim <= 18446744073709551615 + 1:
-        return np.uint64
     else:
         raise ValueError("Requested shape too large to store indexes as integers")
 
