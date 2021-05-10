@@ -44,7 +44,14 @@ def write_example_to_hdf5(hdf5_f,
     data_key_pair_list (list): list of tuples (hdf5_key, data_key)
     '''
     for (hdf5_key, data_key) in data_key_pair_list:
-        hdf5_f[hdf5_key][idx] = np.squeeze(np.array(data_dict[data_key]))
+        try:
+            hdf5_f[hdf5_key][idx] = np.squeeze(np.array(data_dict[data_key]))
+        except OSError as e:
+            hdf5_filename = hdf5_f.filename
+            hdf5_f.close()
+            print('[DELETING BUGGED FILE] {}'.format(hdf5_filename))
+            os.remove(hdf5_filename)
+            raise e
 
 
 def initialize_hdf5_file(hdf5_filename,
