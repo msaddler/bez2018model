@@ -285,7 +285,10 @@ def nervegram(signal,
         if return_meanrates:
             nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
         # Adjust spike times (set t=0 to `clip_start_nervegram` and eliminate negative times)
-        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_sparse]):
+        if any([return_spike_times,
+                return_spike_tensor_sparse,
+                return_spike_tensor_sparse,
+                return_spike_tensor_dense]):
             clip_start_nervegram_time = clip_start_nervegram / nervegram_fs
             clip_end_nervegram_time = clip_end_nervegram / nervegram_fs
             nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
