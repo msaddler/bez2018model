@@ -357,6 +357,7 @@ def nervegram(signal,
         output_dict['nervegram_spike_times'] = nervegram_spike_times
     if return_spike_tensor_sparse:
         output_dict['nervegram_spike_tensor_dense_shape'] = dense_shape
+        output_dict['nervegram_spike_tensor_n'] = nervegram_spike_tensor_sparse.shape[1]
         for idx in range(nervegram_spike_tensor_sparse.shape[0]):
             k = 'nervegram_spike_tensor_sparse{}'.format(idx)
             output_dict[k] = nervegram_spike_tensor_sparse[idx].astype(get_min_idx_dtype(dense_shape[idx]))
