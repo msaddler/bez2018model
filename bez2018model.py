@@ -280,32 +280,47 @@ def nervegram(signal,
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
 
     # ============ RUN AUDITORY NERVE MODEL ============ #
-    pdb.set_trace()
-    nervegram_vihcs, nervegram_meanrates, nervegram_spike_times = run_ANmodel(
-        pin[:, 0],
-        pin_fs=pin_fs,
-        nervegram_fs=nervegram_fs,
-        cf_list=cf_list,
-        species=species,
-        bandwidth_scale_factor=bandwidth_scale_factor,
-        cohc=cohc,
-        cihc=cihc,
-        IhcLowPass_cutoff=IhcLowPass_cutoff,
-        IhcLowPass_order=IhcLowPass_order,
-        noiseType=noiseType,
-        implnt=implnt,
-        spont=spont,
-        tabs=tabs,
-        trel=trel,
-        synapseMode=synapseMode,
-        max_spikes_per_train=max_spikes_per_train,
-        num_spike_trains=num_spike_trains,
-        return_vihcs=return_vihcs,
-        return_meanrates=return_meanrates,
-        return_spike_times=return_spike_times,
-        return_spike_tensor_sparse=return_spike_tensor_sparse,
-        return_spike_tensor_dense=return_spike_tensor_dense)
-    pdb.set_trace()
+    list_nervegram_vihcs = []
+    list_nervegram_meanrates = []
+    list_nervegram_spike_times = []
+    if len(pin.shape) < 2:
+        pin = pin[:, np.newaxis]
+    for itr_channel in range(pin.shape[1]):
+        nervegram_vihcs, nervegram_meanrates, nervegram_spike_times = run_ANmodel(
+            pin[:, itr_channel],
+            pin_fs=pin_fs,
+            nervegram_fs=nervegram_fs,
+            cf_list=cf_list,
+            species=species,
+            bandwidth_scale_factor=bandwidth_scale_factor,
+            cohc=cohc,
+            cihc=cihc,
+            IhcLowPass_cutoff=IhcLowPass_cutoff,
+            IhcLowPass_order=IhcLowPass_order,
+            noiseType=noiseType,
+            implnt=implnt,
+            spont=spont,
+            tabs=tabs,
+            trel=trel,
+            synapseMode=synapseMode,
+            max_spikes_per_train=max_spikes_per_train,
+            num_spike_trains=num_spike_trains,
+            return_vihcs=return_vihcs,
+            return_meanrates=return_meanrates,
+            return_spike_times=return_spike_times,
+            return_spike_tensor_sparse=return_spike_tensor_sparse,
+            return_spike_tensor_dense=return_spike_tensor_dense)
+        list_nervegram_vihcs.append(nervegram_vihcs)
+        list_nervegram_meanrates.append(nervegram_meanrates)
+        list_nervegram_spike_times.append(nervegram_spike_times)
+    # If multi-channel input was provided, stack nervegrams along last axis
+    if pin.shape[1] > 1:
+        nervegram_vihcs = np.stack(list_nervegram_vihcs, axis=-1)
+        nervegram_meanrates = np.stack(list_nervegram_meanrates, axis=-1)
+        nervegram_spike_times = np.stack(list_nervegram_spike_times, axis=-1)
+    else:
+        pin = pin[:, 0]
+    
     # ============ APPLY TRANSFORMATIONS ============ #
     if (nervegram_dur is None) or (nervegram_dur == signal_dur):
         nervegram_dur = signal_dur
