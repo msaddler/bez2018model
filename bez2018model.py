@@ -1,6 +1,7 @@
 import cython_bez2018 # Package must be installed in-place: `python setup.py build_ext --inplace`
 import numpy as np
 import scipy.signal
+import pdb
 
 
 def get_ERB_cf_list(num_cf, min_cf=125.0, max_cf=8e3):
@@ -80,6 +81,81 @@ def sparse_to_dense_nervegram_spike_tensor(dense_shape,
     return nervegram_spike_tensor_dense
 
 
+def run_ANmodel(pin,
+                pin_fs=100e3,
+                nervegram_fs=10e3,
+                cf_list=[],
+                species=2,
+                bandwidth_scale_factor=[],
+                cohc=[],
+                cihc=[],
+                IhcLowPass_cutoff=3e3,
+                IhcLowPass_order=7,
+                noiseType=1,
+                implnt=0,
+                spont=70.0,
+                tabs=6e-4,
+                trel=6e-4,
+                synapseMode=0,
+                max_spikes_per_train=-1,
+                num_spike_trains=40,
+                return_vihcs=True,
+                return_meanrates=True,
+                return_spike_times=True,
+                return_spike_tensor_sparse=True,
+                return_spike_tensor_dense=False):
+    '''
+    '''
+    # Initialize output array lists
+    nervegram_vihcs = []
+    nervegram_meanrates = []
+    nervegram_spike_times = []
+    # Iterate over all CFs and run the auditory nerve model components
+    for cf_idx, cf in enumerate(cf_list):
+        # Run IHC model
+        vihc = cython_bez2018.run_ihc(
+            pin,
+            pin_fs,
+            cf,
+            species=species,
+            bandwidth_scale_factor=bandwidth_scale_factor[cf_idx],
+            cohc=cohc[cf_idx],
+            cihc=cihc[cf_idx],
+            IhcLowPass_cutoff=IhcLowPass_cutoff,
+            IhcLowPass_order=IhcLowPass_order)
+        # Run IHC-ANF synapse model
+        synapse_out = cython_bez2018.run_anf(
+            vihc,
+            pin_fs,
+            cf,
+            noiseType=noiseType,
+            implnt=implnt,
+            spont=spont,
+            tabs=tabs,
+            trel=trel,
+            synapseMode=synapseMode,
+            max_spikes_per_train=max_spikes_per_train,
+            num_spike_trains=num_spike_trains)
+        if return_vihcs:
+            tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
+            nervegram_vihcs.append(tmp_vihc)
+        if return_meanrates:
+            tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
+            tmp_meanrate[tmp_meanrate < 0] = 0
+            nervegram_meanrates.append(tmp_meanrate)
+        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
+            tmp_spike_times = synapse_out['spike_times']
+            nervegram_spike_times.append(tmp_spike_times)
+    # Combine output arrays across CFs
+    if return_vihcs:
+        nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
+    if return_meanrates:
+        nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
+    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
+        nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
+    return nervegram_vihcs, nervegram_meanrates, nervegram_spike_times
+
+
 def nervegram(signal,
               signal_fs,
               nervegram_dur=None,
@@ -119,7 +195,7 @@ def nervegram(signal,
 
     Args
     ----
-    signal (np.ndarray): input pressure waveform must be 1-dimensional array (units Pa)
+    signal (np.ndarray): input pressure waveform(s) with time on axis 0 (units Pa)
     signal_fs (int): sampling rate of input signal (Hz)
     nervegram_dur (float or None): if not None, specifies duration of clipped nervegram
     nervegram_fs (int): sampling rate of nervegram (Hz)
@@ -162,9 +238,8 @@ def nervegram(signal,
     # If specified, set random seed (eliminates stochasticity in ANmodel noise)
     if not (random_seed == None):
         np.random.seed(random_seed)
-    # BEZ2018 ANmodel requires 1 dimensional arrays with dtype np.float64
+    # BEZ2018 ANmodel requires dtype np.float64
     signal = np.squeeze(signal).astype(np.float64)
-    assert len(signal.shape) == 1, "signal must be a 1-dimensional array"
     signal_dur = signal.shape[0] / signal_fs
     # If `cf_list` is not provided, build list from `num_cf`, `min_cf`, and `max_cf`
     if cf_list is None:
@@ -205,57 +280,32 @@ def nervegram(signal,
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
 
     # ============ RUN AUDITORY NERVE MODEL ============ #
-    # Initialize output array lists
-    if return_vihcs:
-        nervegram_vihcs = []
-    if return_meanrates:
-        nervegram_meanrates = []
-    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-        nervegram_spike_times = []
-
-    # Iterate over all CFs and run the auditory nerve model components
-    for cf_idx, cf in enumerate(cf_list):
-        ###### Run IHC model ######
-        vihc = cython_bez2018.run_ihc(pin,
-                                      pin_fs,
-                                      cf,
-                                      species=species,
-                                      bandwidth_scale_factor=bandwidth_scale_factor[cf_idx],
-                                      cohc=cohc[cf_idx],
-                                      cihc=cihc[cf_idx],
-                                      IhcLowPass_cutoff=IhcLowPass_cutoff,
-                                      IhcLowPass_order=IhcLowPass_order)
-        ###### Run IHC-ANF synapse model ######
-        synapse_out = cython_bez2018.run_anf(vihc,
-                                             pin_fs,
-                                             cf,
-                                             noiseType=noiseType,
-                                             implnt=implnt,
-                                             spont=spont,
-                                             tabs=tabs,
-                                             trel=trel,
-                                             synapseMode=synapseMode,
-                                             max_spikes_per_train=max_spikes_per_train,
-                                             num_spike_trains=num_spike_trains)
-        if return_vihcs:
-            tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
-            nervegram_vihcs.append(tmp_vihc)
-        if return_meanrates:
-            tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
-            tmp_meanrate[tmp_meanrate < 0] = 0
-            nervegram_meanrates.append(tmp_meanrate)
-        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-            tmp_spike_times = synapse_out['spike_times']
-            nervegram_spike_times.append(tmp_spike_times)
-
-    # Combine output arrays across CFs
-    if return_vihcs:
-        nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
-    if return_meanrates:
-        nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
-    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-        nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
-
+    pdb.set_trace()
+    nervegram_vihcs, nervegram_meanrates, nervegram_spike_times = run_ANmodel(
+        pin[:, 0],
+        pin_fs=pin_fs,
+        nervegram_fs=nervegram_fs,
+        cf_list=cf_list,
+        species=species,
+        bandwidth_scale_factor=bandwidth_scale_factor,
+        cohc=cohc,
+        cihc=cihc,
+        IhcLowPass_cutoff=IhcLowPass_cutoff,
+        IhcLowPass_order=IhcLowPass_order,
+        noiseType=noiseType,
+        implnt=implnt,
+        spont=spont,
+        tabs=tabs,
+        trel=trel,
+        synapseMode=synapseMode,
+        max_spikes_per_train=max_spikes_per_train,
+        num_spike_trains=num_spike_trains,
+        return_vihcs=return_vihcs,
+        return_meanrates=return_meanrates,
+        return_spike_times=return_spike_times,
+        return_spike_tensor_sparse=return_spike_tensor_sparse,
+        return_spike_tensor_dense=return_spike_tensor_dense)
+    pdb.set_trace()
     # ============ APPLY TRANSFORMATIONS ============ #
     if (nervegram_dur is None) or (nervegram_dur == signal_dur):
         nervegram_dur = signal_dur
