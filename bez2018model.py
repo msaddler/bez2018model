@@ -83,6 +83,21 @@ def sparse_to_dense_nervegram_spike_tensor(dense_shape,
 
 def clip_time_axis(y, t0, t1, sr=100e3, axis=0):
     '''
+    Helper function for clipping time axis of waveforms and nervegram arrays.
+    If `sr` is a string containing "time" and axis is None, then this function
+    will clip timestamps outside of the range [t0, t1] and reset t=0 to t0.
+    
+    Args
+    ----
+    y (np.ndarray): array with time axis
+    t0 (float): clip start time in seconds
+    t1 (float): clip end time in seconds
+    sr (int): sampling rate of time axis in Hz
+    axis (int): indicates time axis
+    
+    Returns
+    -------
+    y (np.ndarray): array with clipped time axis
     '''
     if isinstance(sr, str) and ('time' in sr.lower()):
         assert axis == None, "axis must be `None` to trim `timestamps`"
@@ -101,7 +116,7 @@ def clip_time_axis(y, t0, t1, sr=100e3, axis=0):
     else:
         tmp_slice = [slice(None)] * len(y.shape)
         tmp_slice[axis] = slice(int(t0*sr), int(t1*sr))
-        y = y[tmp_slice]
+        y = y[tuple(tmp_slice)]
     return y
 
 
@@ -129,6 +144,17 @@ def run_ANmodel(pin,
                 return_spike_tensor_sparse=True,
                 return_spike_tensor_dense=False):
     '''
+    Helper function to run auditory nerve model on a single sound waveform.
+    
+    Args
+    ----
+    Arguments are as defined in `nervegram` function
+    
+    Returns
+    -------
+    nervegram_vihcs (np.ndarray): inner hair cell potential array with shape [cf, time]
+    nervegram_meanrates (np.ndarray): firing rate array with shape [cf, time]
+    nervegram_spike_times (np.ndarray): spike time array with shape [spike_trains, cf, n_spikes]
     '''
     # Initialize output array lists
     nervegram_vihcs = []
