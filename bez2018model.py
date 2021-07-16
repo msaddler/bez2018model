@@ -347,7 +347,7 @@ def nervegram(signal,
         # Compute clip start time (clip_t0) and clip end time (clip_t1)
         clip_t0 = np.random.uniform(
             low=buffer_start_dur,
-            high=signal_dur-buffer_end_dur,
+            high=signal_dur-nervegram_dur-buffer_end_dur,
             size=None,
         )
         clip_t1 = clip_t0 + nervegram_dur
@@ -382,7 +382,7 @@ def nervegram(signal,
                 t1=clip_t1,
                 sr=nervegram_fs,
                 axis=1)
-        # Adjust spike times (set t=0 to `clip_start_nervegram` and eliminate negative times)
+        # Adjust spike times (set t=0 to `clip_t0` and eliminate negative times)
         if any([return_spike_times,
                 return_spike_tensor_sparse,
                 return_spike_tensor_sparse,
@@ -391,7 +391,7 @@ def nervegram(signal,
                 nervegram_spike_times,
                 t0=clip_t0,
                 t1=clip_t1,
-                sr='spike_times',
+                sr='timestamps',
                 axis=None)
 
     # Generate sparse representation of binary spike tensor from spike times
@@ -400,14 +400,15 @@ def nervegram(signal,
             nervegram_spike_tensor_fs = nervegram_fs
         # Bin spike times with sampling rate `nervegram_spike_tensor_fs`
         nervegram_spike_idx = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
-        # Binary spike tensor has dense shape [spike_train, CF, time]
-        spike_tensor_time_dim = int(nervegram_dur*nervegram_spike_tensor_fs)
-        dense_shape = np.array(list(nervegram_spike_idx.shape)[:-1] + [spike_tensor_time_dim])
+        # Binary spike tensor has dense shape [spike_train, CF, time, (channel)]
+        dense_shape = list(nervegram_spike_idx.shape)[:-1]
+        dense_shape.insert(2, int(nervegram_dur * nervegram_spike_tensor_fs))
         nervegram_spike_tensor_sparse = []
-        for itr0 in range(nervegram_spike_idx.shape[0]):
-            for itr1 in range(nervegram_spike_idx.shape[1]):
-                for itr2 in np.trim_zeros(nervegram_spike_idx[itr0, itr1], trim='b'):
-                    nervegram_spike_tensor_sparse.append([itr0, itr1, itr2])
+        for spike_idx_arg in np.argwhere(nervegram_spike_idx):
+            t_idx = nervegram_spike_idx[tuple(spike_idx_arg)]
+            sparse_idx = spike_idx_arg.tolist()[:-1]
+            sparse_idx.insert(2, t_idx)
+            nervegram_spike_tensor_sparse.append(sparse_idx)
         nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1)
         if return_spike_tensor_dense:
             nervegram_spike_tensor_dense = sparse_to_dense_nervegram_spike_tensor(
@@ -449,7 +450,7 @@ def nervegram(signal,
     if return_spike_times:
         output_dict['nervegram_spike_times'] = nervegram_spike_times
     if return_spike_tensor_sparse:
-        output_dict['nervegram_spike_tensor_dense_shape'] = dense_shape
+        output_dict['nervegram_spike_tensor_dense_shape'] = np.array(dense_shape, dtype=int)
         output_dict['nervegram_spike_tensor_n'] = nervegram_spike_tensor_sparse.shape[1]
         for idx in range(nervegram_spike_tensor_sparse.shape[0]):
             k = 'nervegram_spike_tensor_sparse{}'.format(idx)
