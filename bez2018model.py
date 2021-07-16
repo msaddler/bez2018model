@@ -89,14 +89,15 @@ def clip_time_axis(y, t0, t1, sr=100e3, axis=0):
         y[y >= t1] = 0
         y = y - t0
         y[y < 0] = 0
-        assert len(y.shape) == 4
-        for itr_fi in range(y.shape[0]):
+        msg = "timestamps must have shape [spike_trains, cf, channel, time]"
+        assert len(y.shape) == 4, msg
+        for itr_st in range(y.shape[0]):
             for itr_cf in range(y.shape[1]):
                 for itr_ch in range(y.shape[2]):
-                    timestamps = y[itr_fi, itr_cf, itr_ch, :]
+                    timestamps = y[itr_st, itr_cf, itr_ch, :]
                     timestamps = timestamps[timestamps > 0]
-                    y[itr_fi, itr_cf, itr_ch, :] = 0
-                    y[itr_fi, itr_cf, itr_ch, 0:timestamps.shape[0]] = timestamps
+                    y[itr_st, itr_cf, itr_ch, :] = 0
+                    y[itr_st, itr_cf, itr_ch, 0:timestamps.shape[0]] = timestamps
     else:
         tmp_slice = [slice(None)] * len(y.shape)
         tmp_slice[axis] = slice(int(t0*sr), int(t1*sr))
@@ -212,7 +213,8 @@ def nervegram(signal,
               return_spike_times=True,
               return_spike_tensor_sparse=True,
               return_spike_tensor_dense=False,
-              nervegram_spike_tensor_fs=100e3):
+              nervegram_spike_tensor_fs=100e3,
+              squeeze_channel_dim=True):
     '''
     Main function for generating an auditory nervegram.
 
@@ -252,6 +254,7 @@ def nervegram(signal,
     return_spike_tensor_sparse (bool): if True, output_dict will contain sparse binary spike tensor
     return_spike_tensor_dense (bool): if True, output_dict will contain dense binary spike tensor
     nervegram_spike_tensor_fs (int): sampling rate of nervegram binary spike tensor (Hz)
+    squeeze_channel_dim (bool): if True, channel dimension is removed when `signal` is 1D array 
 
     Returns
     -------
@@ -262,7 +265,7 @@ def nervegram(signal,
     if not (random_seed == None):
         np.random.seed(random_seed)
     # BEZ2018 ANmodel requires dtype np.float64
-    signal = np.squeeze(signal).astype(np.float64)
+    signal = signal.astype(np.float64)
     signal_dur = signal.shape[0] / signal_fs
     # If `cf_list` is not provided, build list from `num_cf`, `min_cf`, and `max_cf`
     if cf_list is None:
@@ -348,8 +351,7 @@ def nervegram(signal,
         clip_t0 = np.random.uniform(
             low=buffer_start_dur,
             high=signal_dur-nervegram_dur-buffer_end_dur,
-            size=None,
-        )
+            size=None)
         clip_t1 = clip_t0 + nervegram_dur
         assert clip_t1 <= signal_dur - buffer_end_dur, "clip end time out of buffered range"
         # Clip segment of signal (input stimulus)
@@ -393,6 +395,11 @@ def nervegram(signal,
                 t1=clip_t1,
                 sr='timestamps',
                 axis=None)
+    if squeeze_channel_dim and len(signal.shape) == 1:
+        pin = np.squeeze(pin, axis=-1)
+        nervegram_vihcs = np.squeeze(nervegram_vihcs, axis=-1)
+        nervegram_meanrates = np.squeeze(nervegram_meanrates, axis=-1)
+        nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-2)
 
     # Generate sparse representation of binary spike tensor from spike times
     if any([return_spike_tensor_sparse, return_spike_tensor_dense]):
@@ -400,7 +407,7 @@ def nervegram(signal,
             nervegram_spike_tensor_fs = nervegram_fs
         # Bin spike times with sampling rate `nervegram_spike_tensor_fs`
         nervegram_spike_idx = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
-        # Binary spike tensor has dense shape [spike_train, CF, time, (channel)]
+        # Binary spike tensor has dense shape [spike_trains, cf, time, (channel)]
         dense_shape = list(nervegram_spike_idx.shape)[:-1]
         dense_shape.insert(2, int(nervegram_dur * nervegram_spike_tensor_fs))
         nervegram_spike_tensor_sparse = []
