@@ -1,6 +1,7 @@
 import cython_bez2018 # Package must be installed in-place: `python setup.py build_ext --inplace`
 import numpy as np
 import scipy.signal
+import pdb
 
 
 def get_ERB_cf_list(num_cf, min_cf=125.0, max_cf=8e3):
@@ -80,6 +81,131 @@ def sparse_to_dense_nervegram_spike_tensor(dense_shape,
     return nervegram_spike_tensor_dense
 
 
+def clip_time_axis(y, t0, t1, sr=100e3, axis=0):
+    '''
+    Helper function for clipping time axis of waveforms and nervegram arrays.
+    If `sr` is a string containing "time" and axis is None, then this function
+    will clip timestamps outside of the range [t0, t1] and reset t=0 to t0.
+    
+    Args
+    ----
+    y (np.ndarray): array with time axis
+    t0 (float): clip start time in seconds
+    t1 (float): clip end time in seconds
+    sr (int): sampling rate of time axis in Hz
+    axis (int): indicates time axis
+    
+    Returns
+    -------
+    y (np.ndarray): array with clipped time axis
+    '''
+    if isinstance(sr, str) and ('time' in sr.lower()):
+        assert axis == None, "axis must be `None` to trim `timestamps`"
+        y[y >= t1] = 0
+        y = y - t0
+        y[y < 0] = 0
+        msg = "timestamps must have shape [spike_trains, cf, channel, time]"
+        assert len(y.shape) == 4, msg
+        for itr_st in range(y.shape[0]):
+            for itr_cf in range(y.shape[1]):
+                for itr_ch in range(y.shape[2]):
+                    timestamps = y[itr_st, itr_cf, itr_ch, :]
+                    timestamps = timestamps[timestamps > 0]
+                    y[itr_st, itr_cf, itr_ch, :] = 0
+                    y[itr_st, itr_cf, itr_ch, 0:timestamps.shape[0]] = timestamps
+    else:
+        tmp_slice = [slice(None)] * len(y.shape)
+        tmp_slice[axis] = slice(int(t0*sr), int(t1*sr))
+        y = y[tuple(tmp_slice)]
+    return y
+
+
+def run_ANmodel(pin,
+                pin_fs=100e3,
+                nervegram_fs=10e3,
+                cf_list=[],
+                species=2,
+                bandwidth_scale_factor=[],
+                cohc=[],
+                cihc=[],
+                IhcLowPass_cutoff=3e3,
+                IhcLowPass_order=7,
+                noiseType=1,
+                implnt=0,
+                spont=70.0,
+                tabs=6e-4,
+                trel=6e-4,
+                synapseMode=0,
+                max_spikes_per_train=-1,
+                num_spike_trains=40,
+                return_vihcs=True,
+                return_meanrates=True,
+                return_spike_times=True,
+                return_spike_tensor_sparse=True,
+                return_spike_tensor_dense=False):
+    '''
+    Helper function to run auditory nerve model on a single sound waveform.
+    
+    Args
+    ----
+    Arguments are as defined in `nervegram` function
+    
+    Returns
+    -------
+    nervegram_vihcs (np.ndarray): inner hair cell potential array with shape [cf, time]
+    nervegram_meanrates (np.ndarray): firing rate array with shape [cf, time]
+    nervegram_spike_times (np.ndarray): spike time array with shape [spike_trains, cf, n_spikes]
+    '''
+    # Initialize output array lists
+    nervegram_vihcs = []
+    nervegram_meanrates = []
+    nervegram_spike_times = []
+    # Iterate over all CFs and run the auditory nerve model components
+    for cf_idx, cf in enumerate(cf_list):
+        # Run IHC model
+        vihc = cython_bez2018.run_ihc(
+            pin,
+            pin_fs,
+            cf,
+            species=species,
+            bandwidth_scale_factor=bandwidth_scale_factor[cf_idx],
+            cohc=cohc[cf_idx],
+            cihc=cihc[cf_idx],
+            IhcLowPass_cutoff=IhcLowPass_cutoff,
+            IhcLowPass_order=IhcLowPass_order)
+        # Run IHC-ANF synapse model
+        synapse_out = cython_bez2018.run_anf(
+            vihc,
+            pin_fs,
+            cf,
+            noiseType=noiseType,
+            implnt=implnt,
+            spont=spont,
+            tabs=tabs,
+            trel=trel,
+            synapseMode=synapseMode,
+            max_spikes_per_train=max_spikes_per_train,
+            num_spike_trains=num_spike_trains)
+        if return_vihcs:
+            tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
+            nervegram_vihcs.append(tmp_vihc)
+        if return_meanrates:
+            tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
+            tmp_meanrate[tmp_meanrate < 0] = 0
+            nervegram_meanrates.append(tmp_meanrate)
+        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
+            tmp_spike_times = synapse_out['spike_times']
+            nervegram_spike_times.append(tmp_spike_times)
+    # Combine output arrays across CFs
+    if return_vihcs:
+        nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
+    if return_meanrates:
+        nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
+    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
+        nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
+    return nervegram_vihcs, nervegram_meanrates, nervegram_spike_times
+
+
 def nervegram(signal,
               signal_fs,
               nervegram_dur=None,
@@ -113,13 +239,14 @@ def nervegram(signal,
               return_spike_times=True,
               return_spike_tensor_sparse=True,
               return_spike_tensor_dense=False,
-              nervegram_spike_tensor_fs=100e3):
+              nervegram_spike_tensor_fs=100e3,
+              squeeze_channel_dim=True):
     '''
     Main function for generating an auditory nervegram.
 
     Args
     ----
-    signal (np.ndarray): input pressure waveform must be 1-dimensional array (units Pa)
+    signal (np.ndarray): input pressure waveform(s) with time on axis 0 (units Pa)
     signal_fs (int): sampling rate of input signal (Hz)
     nervegram_dur (float or None): if not None, specifies duration of clipped nervegram
     nervegram_fs (int): sampling rate of nervegram (Hz)
@@ -153,6 +280,7 @@ def nervegram(signal,
     return_spike_tensor_sparse (bool): if True, output_dict will contain sparse binary spike tensor
     return_spike_tensor_dense (bool): if True, output_dict will contain dense binary spike tensor
     nervegram_spike_tensor_fs (int): sampling rate of nervegram binary spike tensor (Hz)
+    squeeze_channel_dim (bool): if True, channel dimension is removed when `signal` is 1D array 
 
     Returns
     -------
@@ -162,9 +290,8 @@ def nervegram(signal,
     # If specified, set random seed (eliminates stochasticity in ANmodel noise)
     if not (random_seed == None):
         np.random.seed(random_seed)
-    # BEZ2018 ANmodel requires 1 dimensional arrays with dtype np.float64
-    signal = np.squeeze(signal).astype(np.float64)
-    assert len(signal.shape) == 1, "signal must be a 1-dimensional array"
+    # BEZ2018 ANmodel requires dtype np.float64
+    signal = signal.astype(np.float64)
     signal_dur = signal.shape[0] / signal_fs
     # If `cf_list` is not provided, build list from `num_cf`, `min_cf`, and `max_cf`
     if cf_list is None:
@@ -205,116 +332,116 @@ def nervegram(signal,
         pin_dBSPL = 20 * np.log10(np.sqrt(np.mean(np.square(pin))) / 2e-5)
 
     # ============ RUN AUDITORY NERVE MODEL ============ #
-    # Initialize output array lists
-    if return_vihcs:
-        nervegram_vihcs = []
-    if return_meanrates:
-        nervegram_meanrates = []
-    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-        nervegram_spike_times = []
-
-    # Iterate over all CFs and run the auditory nerve model components
-    for cf_idx, cf in enumerate(cf_list):
-        ###### Run IHC model ######
-        vihc = cython_bez2018.run_ihc(pin,
-                                      pin_fs,
-                                      cf,
-                                      species=species,
-                                      bandwidth_scale_factor=bandwidth_scale_factor[cf_idx],
-                                      cohc=cohc[cf_idx],
-                                      cihc=cihc[cf_idx],
-                                      IhcLowPass_cutoff=IhcLowPass_cutoff,
-                                      IhcLowPass_order=IhcLowPass_order)
-        ###### Run IHC-ANF synapse model ######
-        synapse_out = cython_bez2018.run_anf(vihc,
-                                             pin_fs,
-                                             cf,
-                                             noiseType=noiseType,
-                                             implnt=implnt,
-                                             spont=spont,
-                                             tabs=tabs,
-                                             trel=trel,
-                                             synapseMode=synapseMode,
-                                             max_spikes_per_train=max_spikes_per_train,
-                                             num_spike_trains=num_spike_trains)
-        if return_vihcs:
-            tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
-            nervegram_vihcs.append(tmp_vihc)
-        if return_meanrates:
-            tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
-            tmp_meanrate[tmp_meanrate < 0] = 0
-            nervegram_meanrates.append(tmp_meanrate)
-        if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-            tmp_spike_times = synapse_out['spike_times']
-            nervegram_spike_times.append(tmp_spike_times)
-
-    # Combine output arrays across CFs
-    if return_vihcs:
-        nervegram_vihcs = np.stack(nervegram_vihcs, axis=0).astype(np.float32)
-    if return_meanrates:
-        nervegram_meanrates = np.stack(nervegram_meanrates, axis=0).astype(np.float32)
-    if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-        nervegram_spike_times = np.stack(nervegram_spike_times, axis=1).astype(np.float32)
+    list_nervegram_vihcs = []
+    list_nervegram_meanrates = []
+    list_nervegram_spike_times = []
+    if len(pin.shape) < 2:
+        pin = pin[:, np.newaxis]
+    for itr_channel in range(pin.shape[1]):
+        nervegram_vihcs, nervegram_meanrates, nervegram_spike_times = run_ANmodel(
+            pin[:, itr_channel],
+            pin_fs=pin_fs,
+            nervegram_fs=nervegram_fs,
+            cf_list=cf_list,
+            species=species,
+            bandwidth_scale_factor=bandwidth_scale_factor,
+            cohc=cohc,
+            cihc=cihc,
+            IhcLowPass_cutoff=IhcLowPass_cutoff,
+            IhcLowPass_order=IhcLowPass_order,
+            noiseType=noiseType,
+            implnt=implnt,
+            spont=spont,
+            tabs=tabs,
+            trel=trel,
+            synapseMode=synapseMode,
+            max_spikes_per_train=max_spikes_per_train,
+            num_spike_trains=num_spike_trains,
+            return_vihcs=return_vihcs,
+            return_meanrates=return_meanrates,
+            return_spike_times=return_spike_times,
+            return_spike_tensor_sparse=return_spike_tensor_sparse,
+            return_spike_tensor_dense=return_spike_tensor_dense)
+        list_nervegram_vihcs.append(nervegram_vihcs)
+        list_nervegram_meanrates.append(nervegram_meanrates)
+        list_nervegram_spike_times.append(nervegram_spike_times)
+    nervegram_vihcs = np.stack(list_nervegram_vihcs, axis=-1)
+    nervegram_meanrates = np.stack(list_nervegram_meanrates, axis=-1)
+    nervegram_spike_times = np.stack(list_nervegram_spike_times, axis=-2)
 
     # ============ APPLY TRANSFORMATIONS ============ #
     if (nervegram_dur is None) or (nervegram_dur == signal_dur):
         nervegram_dur = signal_dur
     else:
-        # Compute clip segment start and end indexes
-        buffer_start_idx = int(buffer_start_dur*nervegram_fs)
-        buffer_end_idx = int(signal_dur*nervegram_fs) - int(buffer_end_dur*nervegram_fs)
-        if buffer_start_idx == buffer_end_idx - nervegram_dur*nervegram_fs:
-            clip_start_nervegram = buffer_start_idx
-        else:
-            clip_start_nervegram = np.random.randint(buffer_start_idx,
-                                                     high=buffer_end_idx-nervegram_dur*nervegram_fs)
-        clip_end_nervegram = clip_start_nervegram + int(nervegram_dur*nervegram_fs)
-        assert clip_end_nervegram <= buffer_end_idx, "clip_end_nervegram out of buffered range"
+        # Compute clip start time (clip_t0) and clip end time (clip_t1)
+        clip_t0 = np.random.uniform(
+            low=buffer_start_dur,
+            high=signal_dur-nervegram_dur-buffer_end_dur,
+            size=None)
+        clip_t1 = clip_t0 + nervegram_dur
+        assert clip_t1 <= signal_dur - buffer_end_dur, "clip end time out of buffered range"
         # Clip segment of signal (input stimulus)
-        clip_start_signal = int(clip_start_nervegram * signal_fs / nervegram_fs)
-        clip_end_signal = int(clip_end_nervegram * signal_fs / nervegram_fs)
-        signal = signal[clip_start_signal:clip_end_signal]
+        signal = clip_time_axis(
+            signal,
+            t0=clip_t0,
+            t1=clip_t1,
+            sr=signal_fs,
+            axis=0)
         # Clip segment of pin (stimulus provided to ANmodel)
-        clip_start_pin = int(clip_start_nervegram * pin_fs / nervegram_fs)
-        clip_end_pin = int(clip_end_nervegram * pin_fs / nervegram_fs)
-        pin = pin[clip_start_pin:clip_end_pin]
+        pin = clip_time_axis(
+            pin,
+            t0=clip_t0,
+            t1=clip_t1,
+            sr=pin_fs,
+            axis=0)
         # Clip segment of vihcs (inner hair cell potential)
         if return_vihcs:
-            nervegram_vihcs = nervegram_vihcs[:, clip_start_nervegram:clip_end_nervegram]
+            nervegram_vihcs = clip_time_axis(
+                nervegram_vihcs,
+                t0=clip_t0,
+                t1=clip_t1,
+                sr=nervegram_fs,
+                axis=1)
         # Clip segment of meanrates (instantaneous firing rate)
         if return_meanrates:
-            nervegram_meanrates = nervegram_meanrates[:, clip_start_nervegram:clip_end_nervegram]
-        # Adjust spike times (set t=0 to `clip_start_nervegram` and eliminate negative times)
+            nervegram_meanrates = clip_time_axis(
+                nervegram_meanrates,
+                t0=clip_t0,
+                t1=clip_t1,
+                sr=nervegram_fs,
+                axis=1)
+        # Adjust spike times (set t=0 to `clip_t0` and eliminate negative times)
         if any([return_spike_times,
                 return_spike_tensor_sparse,
                 return_spike_tensor_sparse,
                 return_spike_tensor_dense]):
-            clip_start_nervegram_time = clip_start_nervegram / nervegram_fs
-            clip_end_nervegram_time = clip_end_nervegram / nervegram_fs
-            nervegram_spike_times[nervegram_spike_times >= clip_end_nervegram_time] = 0
-            nervegram_spike_times = nervegram_spike_times - clip_start_nervegram_time
-            nervegram_spike_times[nervegram_spike_times < 0] = 0
-            # Re-order spike times to eliminate leading zeros (spike cannot occur at t=0)
-            for itr0 in range(nervegram_spike_times.shape[0]):
-                for itr1 in range(nervegram_spike_times.shape[1]):
-                    spike_times = nervegram_spike_times[itr0, itr1, :]
-                    spike_times = spike_times[spike_times > 0]
-                    nervegram_spike_times[itr0, itr1, :] = 0
-                    nervegram_spike_times[itr0, itr1, 0:spike_times.shape[0]] = spike_times
+            nervegram_spike_times = clip_time_axis(
+                nervegram_spike_times,
+                t0=clip_t0,
+                t1=clip_t1,
+                sr='timestamps',
+                axis=None)
+    if squeeze_channel_dim and len(signal.shape) == 1:
+        pin = np.squeeze(pin, axis=-1)
+        nervegram_vihcs = np.squeeze(nervegram_vihcs, axis=-1)
+        nervegram_meanrates = np.squeeze(nervegram_meanrates, axis=-1)
+        nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-2)
+
     # Generate sparse representation of binary spike tensor from spike times
     if any([return_spike_tensor_sparse, return_spike_tensor_dense]):
         if nervegram_spike_tensor_fs is None:
             nervegram_spike_tensor_fs = nervegram_fs
         # Bin spike times with sampling rate `nervegram_spike_tensor_fs`
         nervegram_spike_idx = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
-        # Binary spike tensor has dense shape [spike_train, CF, time]
-        spike_tensor_time_dim = int(nervegram_dur*nervegram_spike_tensor_fs)
-        dense_shape = np.array(list(nervegram_spike_idx.shape)[:-1] + [spike_tensor_time_dim])
+        # Binary spike tensor has dense shape [spike_trains, cf, time, (channel)]
+        dense_shape = list(nervegram_spike_idx.shape)[:-1]
+        dense_shape.insert(2, int(nervegram_dur * nervegram_spike_tensor_fs))
         nervegram_spike_tensor_sparse = []
-        for itr0 in range(nervegram_spike_idx.shape[0]):
-            for itr1 in range(nervegram_spike_idx.shape[1]):
-                for itr2 in np.trim_zeros(nervegram_spike_idx[itr0, itr1], trim='b'):
-                    nervegram_spike_tensor_sparse.append([itr0, itr1, itr2])
+        for spike_idx_arg in np.argwhere(nervegram_spike_idx):
+            t_idx = nervegram_spike_idx[tuple(spike_idx_arg)]
+            sparse_idx = spike_idx_arg.tolist()[:-1]
+            sparse_idx.insert(2, t_idx)
+            nervegram_spike_tensor_sparse.append(sparse_idx)
         nervegram_spike_tensor_sparse = np.stack(nervegram_spike_tensor_sparse, axis=1)
         if return_spike_tensor_dense:
             nervegram_spike_tensor_dense = sparse_to_dense_nervegram_spike_tensor(
@@ -356,7 +483,7 @@ def nervegram(signal,
     if return_spike_times:
         output_dict['nervegram_spike_times'] = nervegram_spike_times
     if return_spike_tensor_sparse:
-        output_dict['nervegram_spike_tensor_dense_shape'] = dense_shape
+        output_dict['nervegram_spike_tensor_dense_shape'] = np.array(dense_shape, dtype=int)
         output_dict['nervegram_spike_tensor_n'] = nervegram_spike_tensor_sparse.shape[1]
         for idx in range(nervegram_spike_tensor_sparse.shape[0]):
             k = 'nervegram_spike_tensor_sparse{}'.format(idx)
