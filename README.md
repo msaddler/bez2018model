@@ -1,21 +1,23 @@
-### Python wrapper around the Bruce, Erfani and Zilany (2018) Auditory Nerve Model
+## Python wrapper around the Bruce, Erfani and Zilany (2018) Auditory Nerve Model
 
-The source code for the Bruce et al. (2018) auditory nerve model was downloaded from [https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm]. Source code was modified by Mark Saddler (msaddler@mit.edu) to better interface with Python and allow free manipulation of more parameters (e.g., cochlear filter bandwidths and inner hair cell filter cutoffs). This wrapper was developed for the experiments described in this [paper](https://www.biorxiv.org/content/10.1101/2020.11.19.389999v3):
-    ```
-    @article {Saddler2020.11.19.389999,
-        author = {Saddler, Mark R. and Gonzalez, Ray and McDermott, Josh H.},
-        title = {Deep neural network models reveal interplay of peripheral coding and stimulus statistics in pitch perception},
-        year = {2020},
-        doi = {10.1101/2020.11.19.389999},
-        URL = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999},
-        eprint = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999.full.pdf},
-        journal = {bioRxiv}
-    }
-    ```
+The [source code](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm) for the Bruce et al. (2018) auditory nerve model was modified to better interface with Python and allow free manipulation of parameters such as cochlear filter bandwidths and inner hair cell filter cutoffs. This wrapper was developed for the experiments described in this [paper](https://www.biorxiv.org/content/10.1101/2020.11.19.389999v3):
+```
+@article {Saddler2020.11.19.389999,
+    author = {Saddler, Mark R. and Gonzalez, Ray and McDermott, Josh H.},
+    title = {Deep neural network models reveal interplay of peripheral coding and stimulus statistics in pitch perception},
+    year = {2020},
+    doi = {10.1101/2020.11.19.389999},
+    URL = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999},
+    eprint = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999.full.pdf},
+    journal = {bioRxiv}
+}
+```
+Contact: Mark R. Saddler (msaddler@mit.edu)
 
 
-### ============ Installation ============
+### Installation
 
+```
 (0) Required Python packages:
 
 Package              Version
@@ -26,11 +28,11 @@ numpy                1.16.3
 scipy                1.4.1
 
 (1) clone bez2018model repository
-(2) `cd bez2018model`
-(3) `python setup.py build_ext --inplace`
+(2) cd bez2018model
+(3) python setup.py build_ext --inplace
+```
 
-
-### ============ Example Usage ============
+### Example usage
 
 ```
 import bez2018model
@@ -41,7 +43,7 @@ nervegram_output_dict = bez2018model.nervegram(signal, signal_fs, **kwargs)
 ```
 
 
-### ============ README from the Bruce et al. (2018) source code ============
+### README from the Bruce et al. (2018) source code
 
 This is the BEZ2018 version of the code for auditory periphery model from
 the Carney, Bruce and Zilany labs.
