@@ -1,6 +1,6 @@
 ## Python wrapper around the Bruce, Erfani, and Zilany (2018) auditory nerve model
 
-The [source code](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm) for the Bruce et al. (2018) auditory nerve model was modified to better interface with Python and allow free manipulation of parameters such as cochlear filter bandwidths and inner hair cell filter cutoffs. This wrapper was developed for the experiments described in this [paper](https://www.biorxiv.org/content/10.1101/2020.11.19.389999v3):
+The [source code](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm) for the Bruce et al. (2018) auditory nerve model was modified to interface with Python and allow easy manipulation of parameters such as cochlear filter bandwidths and inner hair cell filter cutoffs. This wrapper was developed for the experiments in this [paper](https://www.biorxiv.org/content/10.1101/2020.11.19.389999v3):
 ```
 @article {Saddler2020.11.19.389999,
     author = {Saddler, Mark R. and Gonzalez, Ray and McDermott, Josh H.},
