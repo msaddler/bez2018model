@@ -160,6 +160,12 @@ def run_ANmodel(pin,
     nervegram_vihcs = []
     nervegram_meanrates = []
     nervegram_spike_times = []
+    # Check num_spike_trains argument
+    num_spike_trains = max(1, num_spike_trains) # num_spike_trains must be >= 1 to run AN model
+    if not any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
+        # It is needlessly inefficient to set num_spike_trains > 1 if spikes are not being returned
+        # (analytical estimates of instantaneous firing rates are computed on first AN model run)
+        num_spike_trains = 1
     # Iterate over all CFs and run the auditory nerve model components
     for cf_idx, cf in enumerate(cf_list):
         # Run IHC model
