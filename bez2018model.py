@@ -186,7 +186,7 @@ def run_ANmodel(pin,
             cf,
             noiseType=noiseType,
             implnt=implnt,
-            spont=spont,
+            list_spont=np.array([spont]),
             tabs=tabs,
             trel=trel,
             synapseMode=synapseMode,
@@ -196,11 +196,11 @@ def run_ANmodel(pin,
             tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
             nervegram_vihcs.append(tmp_vihc)
         if return_meanrates:
-            tmp_meanrate = scipy.signal.resample_poly(synapse_out['meanrate'], int(nervegram_fs), int(pin_fs))
+            tmp_meanrate = scipy.signal.resample_poly(synapse_out['list_meanrate'][0], int(nervegram_fs), int(pin_fs))
             tmp_meanrate[tmp_meanrate < 0] = 0
             nervegram_meanrates.append(tmp_meanrate)
         if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-            tmp_spike_times = synapse_out['spike_times']
+            tmp_spike_times = synapse_out['list_spike_times'][0]
             nervegram_spike_times.append(tmp_spike_times)
     # Combine output arrays across CFs
     if return_vihcs:
