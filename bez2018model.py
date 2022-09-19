@@ -104,15 +104,16 @@ def clip_time_axis(y, t0, t1, sr=100e3, axis=0):
         y[y >= t1] = 0
         y = y - t0
         y[y < 0] = 0
-        msg = "timestamps must have shape [spike_trains, cf, channel, time]"
-        assert len(y.shape) == 4, msg
+        msg = "timestamps must have shape [spike_trains, cf, spont, channel, time]"
+        assert len(y.shape) == 5, msg
         for itr_st in range(y.shape[0]):
             for itr_cf in range(y.shape[1]):
-                for itr_ch in range(y.shape[2]):
-                    timestamps = y[itr_st, itr_cf, itr_ch, :]
-                    timestamps = timestamps[timestamps > 0]
-                    y[itr_st, itr_cf, itr_ch, :] = 0
-                    y[itr_st, itr_cf, itr_ch, 0:timestamps.shape[0]] = timestamps
+                for itr_sp in range(y.shape[2]):
+                    for itr_ch in range(y.shape[3]):
+                        timestamps = y[itr_st, itr_cf, itr_sp, itr_ch, :]
+                        timestamps = timestamps[timestamps > 0]
+                        y[itr_st, itr_cf, itr_sp, itr_ch, :] = 0
+                        y[itr_st, itr_cf, itr_sp, itr_ch, 0:timestamps.shape[0]] = timestamps
     else:
         tmp_slice = [slice(None)] * len(y.shape)
         tmp_slice[axis] = slice(int(t0*sr), int(t1*sr))
@@ -160,6 +161,8 @@ def run_ANmodel(pin,
     nervegram_vihcs = []
     nervegram_meanrates = []
     nervegram_spike_times = []
+    # Convert `spont` (float or list) to one-dimensional np.ndarray
+    list_spont = np.array(spont, dtype=np.float64).reshape([-1])
     # Check num_spike_trains argument
     num_spike_trains = max(1, num_spike_trains) # num_spike_trains must be >= 1 to run AN model
     if not any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
@@ -186,7 +189,7 @@ def run_ANmodel(pin,
             cf,
             noiseType=noiseType,
             implnt=implnt,
-            list_spont=np.array([spont]),
+            list_spont=list_spont,
             tabs=tabs,
             trel=trel,
             synapseMode=synapseMode,
@@ -196,11 +199,11 @@ def run_ANmodel(pin,
             tmp_vihc = scipy.signal.resample_poly(vihc, int(nervegram_fs), int(pin_fs))
             nervegram_vihcs.append(tmp_vihc)
         if return_meanrates:
-            tmp_meanrate = scipy.signal.resample_poly(synapse_out['list_meanrate'][0], int(nervegram_fs), int(pin_fs))
+            tmp_meanrate = scipy.signal.resample_poly(synapse_out['list_meanrate'], int(nervegram_fs), int(pin_fs))
             tmp_meanrate[tmp_meanrate < 0] = 0
             nervegram_meanrates.append(tmp_meanrate)
         if any([return_spike_times, return_spike_tensor_sparse, return_spike_tensor_dense]):
-            tmp_spike_times = synapse_out['list_spike_times'][0]
+            tmp_spike_times = synapse_out['list_spike_times']
             nervegram_spike_times.append(tmp_spike_times)
     # Combine output arrays across CFs
     if return_vihcs:
@@ -246,6 +249,7 @@ def nervegram(signal,
               return_spike_tensor_sparse=True,
               return_spike_tensor_dense=False,
               nervegram_spike_tensor_fs=100e3,
+              squeeze_spont_dim=True,
               squeeze_channel_dim=True):
     '''
     Main function for generating an auditory nervegram.
@@ -274,7 +278,7 @@ def nervegram(signal,
     cihc (float or list): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
     IhcLowPass_cutoff (float): cutoff frequency for IHC lowpass filter (Hz)
     IhcLowPass_order (int): order for IHC lowpass filter
-    spont (float): spontaneous firing rate in spikes per second
+    spont (float or list): spontaneous firing rate(s) in spikes per second
     noiseType (int): set to 0 for noiseless and 1 for variable fGn
     implnt (int): set to 0 for "approx" and 1 for "actual" power-law function implementation
     tabs (float): absolute refractory period in seconds
@@ -286,6 +290,7 @@ def nervegram(signal,
     return_spike_tensor_sparse (bool): if True, output_dict will contain sparse binary spike tensor
     return_spike_tensor_dense (bool): if True, output_dict will contain dense binary spike tensor
     nervegram_spike_tensor_fs (int): sampling rate of nervegram binary spike tensor (Hz)
+    squeeze_spont_dim (bool): if True, spont rate dimension is removed when `spont` is a float
     squeeze_channel_dim (bool): if True, channel dimension is removed when `signal` is 1D array 
 
     Returns
@@ -427,6 +432,9 @@ def nervegram(signal,
                 t1=clip_t1,
                 sr='timestamps',
                 axis=None)
+    if squeeze_spont_dim and np.ndim(spont) == 0:
+        nervegram_meanrates = np.squeeze(nervegram_meanrates, axis=-2)
+        nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-3)
     if squeeze_channel_dim and len(signal.shape) == 1:
         pin = np.squeeze(pin, axis=-1)
         nervegram_vihcs = np.squeeze(nervegram_vihcs, axis=-1)

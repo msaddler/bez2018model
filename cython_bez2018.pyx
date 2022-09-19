@@ -365,6 +365,9 @@ def run_anf(
         free(trd_vector_data)
         output_dict['list_meanrate'].append(meanrate)
         output_dict['list_spike_times'].append(spike_times)
+    # Stack outputs across spontaneous rates (list_spike_times requires timestamps on last axis)
+    output_dict['list_meanrate'] = np.stack(output_dict['list_meanrate'], axis=-1)
+    output_dict['list_spike_times'] = np.stack(output_dict['list_spike_times'], axis=-2)
     return output_dict
 
 
