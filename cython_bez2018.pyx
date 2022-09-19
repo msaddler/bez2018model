@@ -293,10 +293,8 @@ def run_anf(
     cdef double *sptime_data = <double *>malloc(max_spikes_per_train*sizeof(double))
     cdef double *trd_vector_data = <double *>malloc(len(vihc)*sizeof(double))
     # Run synapse model for each spontaneous rate
-    output_dict = {
-        'list_meanrate': [],
-        'list_spike_times': [],
-    }
+    list_meanrate = []
+    list_spike_times = []
     for spont in list_spont:
         # Fixed parameters for Synapse and SpikeGenerator functions
         tdres = 1/fs
@@ -361,13 +359,15 @@ def run_anf(
                 trel_vector[IDX] = trel * 100 / synout[IDX]
                 trel_vector[trel_vector > trel] = trel
                 meanrate[IDX] = synout[IDX] / (synout[IDX] * (tabs + trd_vector[IDX] / nSites + trel_vector[IDX]) + 1)
-        free(sptime_data)
-        free(trd_vector_data)
-        output_dict['list_meanrate'].append(meanrate)
-        output_dict['list_spike_times'].append(spike_times)
-    # Stack outputs across spontaneous rates (list_spike_times requires timestamps on last axis)
-    output_dict['list_meanrate'] = np.stack(output_dict['list_meanrate'], axis=-1)
-    output_dict['list_spike_times'] = np.stack(output_dict['list_spike_times'], axis=-2)
+        list_meanrate.append(meanrate)
+        list_spike_times.append(spike_times)
+    # Free allocated memory and stack outputs from different spontaneous rates
+    free(sptime_data)
+    free(trd_vector_data)
+    output_dict = {
+        'list_meanrate': np.stack(list_meanrate, axis=-1),
+        'list_spike_times': np.stack(list_spike_times, axis=-2), # last axis reserved for timestamps
+    }
     return output_dict
 
 
