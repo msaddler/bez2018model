@@ -137,7 +137,7 @@ def run_ANmodel(pin,
                 tabs=6e-4,
                 trel=6e-4,
                 synapseMode=0,
-                max_spikes_per_train=-1,
+                max_spikes_per_train=1000,
                 num_spike_trains=40,
                 return_vihcs=True,
                 return_meanrates=True,
@@ -231,7 +231,7 @@ def nervegram(signal,
               min_cf=125.0,
               max_cf=8e3,
               synapseMode=0,
-              max_spikes_per_train=-1,
+              max_spikes_per_train=1000,
               num_spike_trains=40,
               cohc=1.0,
               cihc=1.0,
@@ -272,7 +272,7 @@ def nervegram(signal,
     min_cf (float): if cf_list is None, specifies minimum CF (Hz)
     max_cf (float): if cf_list is None, specifies maximum CF (Hz)
     synapseMode (float): set to 1 to re-run synapse model for each spike train (0 to re-use synout)
-    max_spikes_per_train (int): max array size for spike times output (<0 to auto-select)
+    max_spikes_per_train (int): max array size for spike times output
     num_spike_trains (int): number of spike trains to sample from spike generator
     cohc (float or list): OHC scaling factor: 1=normal OHC function, 0=complete OHC dysfunction
     cihc (float or list): IHC scaling factor: 1=normal IHC function, 0=complete IHC dysfunction
