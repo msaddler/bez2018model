@@ -219,6 +219,7 @@ def nervegram(signal,
               signal_fs,
               nervegram_dur=None,
               nervegram_fs=10e3,
+              nervegram_dtype='float32',
               buffer_start_dur=0.0,
               buffer_end_dur=0.0,
               pin_fs=100e3,
@@ -260,6 +261,7 @@ def nervegram(signal,
     signal_fs (int): sampling rate of input signal (Hz)
     nervegram_dur (float or None): if not None, specifies duration of clipped nervegram
     nervegram_fs (int): sampling rate of nervegram (Hz)
+    nervegram_dtype (str): data type of nervegram (float64, float32, or float16)
     buffer_start_dur (float): period to ignore at start of nervegram (s)
     buffer_end_dur (float): period to ignore at end of nervegram (s)
     pin_fs (int): sampling rate of input signal passed to ANmodel (100000 Hz)
@@ -491,11 +493,11 @@ def nervegram(signal,
         'trel': trel,
     }
     if return_vihcs:
-        output_dict['nervegram_vihcs'] = nervegram_vihcs
+        output_dict['nervegram_vihcs'] = nervegram_vihcs.astype(nervegram_dtype)
     if return_meanrates:
-        output_dict['nervegram_meanrates'] = nervegram_meanrates
+        output_dict['nervegram_meanrates'] = nervegram_meanrates.astype(nervegram_dtype)
     if return_spike_times:
-        output_dict['nervegram_spike_times'] = nervegram_spike_times
+        output_dict['nervegram_spike_times'] = nervegram_spike_times.astype(nervegram_dtype)
     if return_spike_tensor_sparse:
         output_dict['nervegram_spike_tensor_dense_shape'] = np.array(dense_shape, dtype=int)
         output_dict['nervegram_spike_tensor_n'] = nervegram_spike_tensor_sparse.shape[1]
