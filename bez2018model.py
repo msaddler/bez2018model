@@ -451,7 +451,7 @@ def nervegram(signal,
         nervegram_spike_idx = (nervegram_spike_times * nervegram_spike_tensor_fs).astype(int)
         # Binary spike tensor has dense shape [spike_trains, cf, time, (channel)]
         dense_shape = list(nervegram_spike_idx.shape)[:-1]
-        dense_shape.insert(2, int(nervegram_dur * nervegram_spike_tensor_fs))
+        dense_shape.insert(2, np.ceil(nervegram_dur * nervegram_spike_tensor_fs).astype(int))
         nervegram_spike_tensor_sparse = []
         for spike_idx_arg in np.argwhere(nervegram_spike_idx):
             t_idx = nervegram_spike_idx[tuple(spike_idx_arg)]
