@@ -436,12 +436,20 @@ def nervegram(signal,
                 axis=None)
     if squeeze_spont_dim and np.ndim(spont) == 0:
         nervegram_meanrates = np.squeeze(nervegram_meanrates, axis=-2)
-        nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-3)
+        if any([return_spike_times,
+                return_spike_tensor_sparse,
+                return_spike_tensor_sparse,
+                return_spike_tensor_dense]):
+            nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-3)
     if squeeze_channel_dim and len(signal.shape) == 1:
         pin = np.squeeze(pin, axis=-1)
         nervegram_vihcs = np.squeeze(nervegram_vihcs, axis=-1)
         nervegram_meanrates = np.squeeze(nervegram_meanrates, axis=-1)
-        nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-2)
+        if any([return_spike_times,
+                return_spike_tensor_sparse,
+                return_spike_tensor_sparse,
+                return_spike_tensor_dense]):
+            nervegram_spike_times = np.squeeze(nervegram_spike_times, axis=-2)
 
     # Generate sparse representation of binary spike tensor from spike times
     if any([return_spike_tensor_sparse, return_spike_tensor_dense]):
