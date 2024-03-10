@@ -1,17 +1,10 @@
 ## Python wrapper around the Bruce, Erfani, and Zilany (2018) auditory nerve model
 
-The [source code](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm) for the Bruce et al. (2018) auditory nerve model was modified to interface with Python and allow easy manipulation of parameters such as cochlear filter bandwidths and inner hair cell filter cutoffs. This wrapper was developed for the experiments in this [paper](https://www.biorxiv.org/content/10.1101/2020.11.19.389999v3):
-```
-@article {Saddler2020.11.19.389999,
-    author = {Saddler, Mark R. and Gonzalez, Ray and McDermott, Josh H.},
-    title = {Deep neural network models reveal interplay of peripheral coding and stimulus statistics in pitch perception},
-    year = {2020},
-    doi = {10.1101/2020.11.19.389999},
-    URL = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999},
-    eprint = {https://www.biorxiv.org/content/early/2020/12/01/2020.11.19.389999.full.pdf},
-    journal = {bioRxiv}
-}
-```
+The [source code](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm) for the Bruce et al. (2018) auditory nerve model was modified to interface with Python and allow easy manipulation of parameters such as cochlear filter bandwidths and inner hair cell filter cutoffs. This wrapper was developed for the experiments in our [paper](https://doi.org/10.1038/s41467-021-27366-6):
+
+    "Deep neural network models reveal interplay of peripheral coding and stimulus statistics in pitch perception".
+    Mark R. Saddler, Ray Gonzalez, Josh H. McDermott (Nature Communications, 2021).
+
 Contact: Mark R. Saddler (msaddler@mit.edu)
 
 
