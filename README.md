@@ -11,14 +11,19 @@ Contact: Mark R. Saddler (msaddler@mit.edu)
 ### Installation
 
 ```
-(0) Required Python packages:
+(0) Set up a Python environment with the following packages:
 
-Package              Version
--------------------- ----------------------
-Cython               0.29.24
-h5py                 2.9.0
-numpy                1.16.3
-scipy                1.4.1
+    Package              Version
+    -------------------- ----------------------
+    setuptools           84.0.0
+    Cython               3.3.0
+    h5py                 3.16.0
+    numpy                2.5.2
+    scipy                1.18.1
+
+    $ conda create -n myenv python
+    $ conda activate myenv
+    $ pip install setuptools cython h5py numpy scipy
 
 (1) clone bez2018model repository
 (2) cd bez2018model
